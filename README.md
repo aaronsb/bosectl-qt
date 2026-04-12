@@ -178,4 +178,4 @@ MIT — see [LICENSE](LICENSE).
 
 ## Author
 
-Aaron Bockelie <aaronsb@gmail.com>
+Aaron Bockelie
