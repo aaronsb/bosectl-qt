@@ -47,6 +47,10 @@ Currently verified:
 
 Other Bose devices may work — see the [bosectl device support list](https://github.com/aaronsb/bosectl#supported-devices).
 
+## Installation
+
+> **Pre-built binaries are coming soon** — Flatpak, AppImage, and distro packages are on the roadmap. For now, build from source (below).
+
 ## Building
 
 ### Dependencies
@@ -139,6 +143,15 @@ The NC window displays a reminder about these, and ANC / Wind Block are exposed 
 All blocking Bluetooth I/O runs on a dedicated worker thread. The GUI queues operations via `QMetaObject::invokeMethod` and receives state updates via queued signals. A RAII `BusyGuard` around each worker slot emits `busy(true/false)` so every window can show a "Working…" indicator automatically.
 
 Settings are stored in `~/.config/bosectl-qt/bosectl-qt.conf` via `QSettings`.
+
+## Roadmap
+
+- [ ] Pre-built binaries: Flatpak, AppImage, Arch AUR, Debian package
+- [ ] CI builds with GitHub Actions
+- [ ] Button remapping UI (bmap library already supports it)
+- [ ] Voice prompts language selector
+- [ ] Extended device support (QC Ultra Earbuds, QC45, etc.) once bosectl upstream adds configs
+- [ ] Translations
 
 ## Credits
 
