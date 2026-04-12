@@ -37,4 +37,4 @@ install(FILES resources/bosectl-qt.desktop
 install(FILES resources/bosectl-qt.svg
         DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/scalable/apps)
 install(FILES resources/bosectl-qt-autostart.desktop
-        DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/xdg/autostart)
+        DESTINATION /etc/xdg/autostart)
