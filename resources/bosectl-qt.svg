@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Headband -->
+  <path d="M12 30 C12 14 52 14 52 30" stroke="#e0e0e0" stroke-width="4" stroke-linecap="round" fill="none"/>
+  <!-- Left ear cup -->
+  <rect x="6" y="28" width="14" height="20" rx="5" fill="#404040" stroke="#e0e0e0" stroke-width="2"/>
+  <rect x="9" y="32" width="8" height="12" rx="3" fill="#606060"/>
+  <!-- Right ear cup -->
+  <rect x="44" y="28" width="14" height="20" rx="5" fill="#404040" stroke="#e0e0e0" stroke-width="2"/>
+  <rect x="47" y="32" width="8" height="12" rx="3" fill="#606060"/>
+  <!-- Bose-style accent -->
+  <circle cx="13" cy="38" r="2" fill="#b0b0b0"/>
+  <circle cx="51" cy="38" r="2" fill="#b0b0b0"/>
+  <!-- Padding arcs -->
+  <path d="M12 28 Q12 24 16 24" stroke="#e0e0e0" stroke-width="2" fill="none"/>
+  <path d="M52 28 Q52 24 48 24" stroke="#e0e0e0" stroke-width="2" fill="none"/>
+</svg>

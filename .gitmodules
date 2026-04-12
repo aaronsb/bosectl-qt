@@ -1,0 +1,3 @@
+[submodule "lib/bosectl"]
+	path = lib/bosectl
+	url = https://github.com/aaronsb/bosectl

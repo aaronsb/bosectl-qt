@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Bose Headphone Control
+Exec=bosectl-qt
+Icon=bosectl-qt
+Terminal=false
+X-GNOME-Autostart-enabled=true
+X-KDE-autostart-after=panel
+Comment=Start Bose headphone tray control

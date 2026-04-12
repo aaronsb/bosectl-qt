@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Bose Headphone Control
+GenericName=Headphone Controller
+Comment=System tray control for Bose headphones via BMAP protocol
+Exec=bosectl-qt
+Icon=bosectl-qt
+Terminal=false
+Categories=Audio;Settings;HardwareSettings;
+Keywords=bose;headphones;bluetooth;noise;cancellation;equalizer;
+StartupNotify=false

@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/">
+        <file>bosectl-qt.svg</file>
+    </qresource>
+</RCC>
