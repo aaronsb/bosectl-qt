@@ -49,7 +49,21 @@ Other Bose devices may work — see the [bosectl device support list](https://gi
 
 ## Installation
 
-> **Pre-built binaries are coming soon** — Flatpak, AppImage, and distro packages are on the roadmap. For now, build from source (below).
+### Arch Linux (AUR)
+
+```bash
+# Stable release
+yay -S bosectl-qt
+
+# Git HEAD
+yay -S bosectl-qt-git
+```
+
+(Replace `yay` with your preferred AUR helper, or use `makepkg` directly.)
+
+### Other distros
+
+Flatpak and AppImage builds are planned. For now, [build from source](#building).
 
 ## Building
 
