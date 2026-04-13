@@ -24,7 +24,7 @@ source=(
     "bosectl::git+https://github.com/aaronsb/bosectl.git#commit=$_bosectl_commit"
 )
 sha256sums=(
-    'SKIP'
+    'efaaabcd84a3ee44eb0d296ea4ba1e9a6453981836ac1060ddc57ef2fb1591b3'
     'SKIP'
 )
 
