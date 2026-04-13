@@ -187,7 +187,7 @@ void TrayIcon::buildMenu() {
             QString("<h3>bosectl-qt</h3>"
                     "<p>A Qt6 system tray application for controlling "
                     "Bose headphones over Bluetooth via the BMAP protocol.</p>"
-                    "<p>Version 0.1.0</p>"
+                    "<p>Version 0.3.0</p>"
                     "<p>Built on the <a href=\"https://github.com/aaronsb/bosectl\">bosectl</a> "
                     "reverse-engineered BMAP library.</p>"
                     "<p>By Aaron Bockelie &lt;<a href=\"mailto:aaronsb@gmail.com\">"
