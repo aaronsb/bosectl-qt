@@ -15,6 +15,7 @@ TrayIcon::TrayIcon(QObject* parent)
     , modeWindow_(new ModeWindow)
     , eqWindow_(new EqWindow)
     , dialogAnchor_(new QWidget)
+    , batteryProvider_(new BluezBatteryProvider(this))
     , worker_(new BmapWorker)
     , pollTimer_(new QTimer(this))
 {
@@ -307,9 +308,15 @@ void TrayIcon::onStatusReady(DeviceState state) {
         macAction_->setText("MAC: --");
         connectAction_->setText("Connect");
         powerOffAction_->setEnabled(false);
+        batteryProvider_->clear();
         updateTooltip();
         return;
     }
+
+    // Publish battery via BlueZ so system indicators (UPower → GNOME/KDE)
+    // see the reading. Safe to call every update: idempotent for identical
+    // values and handles device-change transitions internally.
+    batteryProvider_->publish(state.mac, state.deviceType, state.battery);
 
     // Save settings
     settings_.setLastMac(state.mac);

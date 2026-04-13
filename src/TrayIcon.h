@@ -7,6 +7,7 @@
 #include <QThread>
 #include <QTimer>
 
+#include "BluezBatteryProvider.h"
 #include "BmapWorker.h"
 #include "Settings.h"
 #include "EqWindow.h"
@@ -76,6 +77,7 @@ private:
     QThread workerThread_;
     BmapWorker* worker_;
     QTimer* pollTimer_;
+    BluezBatteryProvider* batteryProvider_;
 
     Settings settings_;
     DeviceState lastState_;
