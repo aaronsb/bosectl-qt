@@ -1,5 +1,7 @@
 #include "EqWindow.h"
 
+#include "Logging.h"
+
 EqWindow::EqWindow(QWidget* parent)
     : QWidget(parent, Qt::Window)
 {
@@ -32,6 +34,9 @@ void EqWindow::setSavedEq(int8_t bass, int8_t mid, int8_t treble) {
 }
 
 void EqWindow::onTry() {
+    qCInfo(lcUi) << "EQ: try clicked; bass=" << bassSlider_->value()
+                 << "mid=" << midSlider_->value()
+                 << "treble=" << trebleSlider_->value();
     emit eqTry(bassSlider_->value(), midSlider_->value(), trebleSlider_->value());
 }
 
@@ -39,10 +44,13 @@ void EqWindow::onSave() {
     savedBass_ = bassSlider_->value();
     savedMid_ = midSlider_->value();
     savedTreble_ = trebleSlider_->value();
+    qCInfo(lcUi) << "EQ: save clicked; bass=" << savedBass_
+                 << "mid=" << savedMid_ << "treble=" << savedTreble_;
     emit eqSave(savedBass_, savedMid_, savedTreble_);
 }
 
 void EqWindow::onReset() {
+    qCInfo(lcUi) << "EQ: reset clicked";
     setCurrentEq(0, 0, 0);
     emit eqTry(0, 0, 0);
 }

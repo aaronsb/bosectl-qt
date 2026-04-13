@@ -10,6 +10,7 @@
 #include <mutex>
 
 #include "bmap.h"
+#include "Logging.h"
 
 struct EqState {
     int8_t bass = 0;
@@ -69,40 +70,73 @@ signals:
     void busy(bool working);
 
 public slots:
-    void connectDevice(const QString& mac = {}, const QString& deviceType = {}) {
+    void connectDevice(const QString& mac, const QString& deviceType, bool announceError) {
         BusyGuard guard(this);
-        try {
-            std::lock_guard lock(mutex_);
-            conn_ = bmap::connect(mac.toStdString(), deviceType.toStdString());
-            // Store connection info for status reports
-            connMac_ = mac;
-            if (connMac_.isEmpty()) {
-                // Was auto-detected; try to get it from discovery
-                auto detected = bmap::find_bmap_device();
-                if (detected) {
-                    connMac_ = QString::fromStdString(detected->first);
-                    connDeviceType_ = QString::fromStdString(detected->second);
-                }
-            } else {
-                connDeviceType_ = deviceType;
-            }
-            emitStatus();
-        } catch (const std::exception& e) {
+        qCInfo(lcWorker) << "connectDevice: mac=" << (mac.isEmpty() ? "<auto>" : mac)
+                         << "type=" << (deviceType.isEmpty() ? "<auto>" : deviceType)
+                         << "announceError=" << announceError;
+
+        std::lock_guard lock(mutex_);
+
+        // Close any existing socket and give bluez time to release the rfcomm
+        // channel. Without this settle delay the next bmap::connect() race-
+        // loses to the kernel and returns EBUSY.
+        if (conn_) {
+            qCInfo(lcWorker) << "connectDevice: closing existing connection first";
             conn_.reset();
-            emit error(QString::fromStdString(e.what()));
-            emit statusReady(DeviceState{});
+            QThread::msleep(kReconnectSettleMs);
         }
+
+        // Retry on transient failures. EBUSY and similar post-teardown errors
+        // usually clear within a second — worth absorbing silently instead of
+        // surfacing a scary disconnect notification.
+        std::string lastErr;
+        for (int attempt = 1; attempt <= kConnectMaxAttempts; ++attempt) {
+            try {
+                conn_ = bmap::connect(mac.toStdString(), deviceType.toStdString());
+                connMac_ = mac;
+                if (connMac_.isEmpty()) {
+                    auto detected = bmap::find_bmap_device();
+                    if (detected) {
+                        connMac_ = QString::fromStdString(detected->first);
+                        connDeviceType_ = QString::fromStdString(detected->second);
+                    }
+                } else {
+                    connDeviceType_ = deviceType;
+                }
+                qCInfo(lcWorker) << "connectDevice: success on attempt" << attempt
+                                 << "mac=" << connMac_ << "type=" << connDeviceType_;
+                emitStatus();
+                return;
+            } catch (const std::exception& e) {
+                lastErr = e.what();
+                qCWarning(lcWorker) << "connectDevice: attempt" << attempt
+                                    << "of" << kConnectMaxAttempts << "failed:" << e.what();
+                if (attempt < kConnectMaxAttempts) {
+                    QThread::msleep(kConnectRetryDelayMs);
+                }
+            }
+        }
+
+        conn_.reset();
+        if (announceError) {
+            emit error(friendlyConnectError(lastErr));
+        }
+        emit statusReady(DeviceState{});
     }
 
     void refresh() {
         std::lock_guard lock(mutex_);
         if (!conn_) {
+            qCDebug(lcWorker) << "refresh: no connection, skipping";
             emit statusReady(DeviceState{});
             return;
         }
         try {
+            qCDebug(lcWorker) << "refresh: polling status";
             emitStatus();
         } catch (const std::exception& e) {
+            qCWarning(lcWorker) << "refresh: failed:" << e.what();
             conn_.reset();
             emit error(QString::fromStdString(e.what()));
             emit disconnected();
@@ -155,6 +189,17 @@ public slots:
         if (!conn_) return;
         try {
             conn_->set_spatial(mode.toStdString());
+            emitStatus();
+        } catch (const std::exception& e) { emit error(QString::fromStdString(e.what())); }
+    }
+
+    void setName(const QString& name) {
+        BusyGuard guard(this);
+        std::lock_guard lock(mutex_);
+        if (!conn_) return;
+        try {
+            qCInfo(lcWorker) << "setName:" << name;
+            conn_->set_name(name.toStdString());
             emitStatus();
         } catch (const std::exception& e) { emit error(QString::fromStdString(e.what())); }
     }
@@ -304,6 +349,29 @@ private:
         BusyGuard(BmapWorker* w) : w(w) { emit w->busy(true); }
         ~BusyGuard() { emit w->busy(false); }
     };
+
+    static constexpr int kReconnectSettleMs = 300;
+    static constexpr int kConnectRetryDelayMs = 500;
+    static constexpr int kConnectMaxAttempts = 3;
+
+    // Translate kernel errno strings from libbmap's "Failed to connect ...:"
+    // wrapper into messages a user can actually act on.
+    static QString friendlyConnectError(const std::string& raw) {
+        const QString s = QString::fromStdString(raw);
+        struct Pair { const char* needle; const char* msg; };
+        static constexpr Pair kMap[] = {
+            {"Host is down",              "Headphones appear to be off or out of range."},
+            {"No route to host",          "Cannot reach the headphones — are they powered on?"},
+            {"Device or resource busy",   "Bluetooth is busy — try again in a moment."},
+            {"Operation now in progress", "Connection timed out — headphones not responding."},
+            {"Connection timed out",      "Connection timed out — headphones not responding."},
+            {"Connection refused",        "Headphones refused the connection."},
+        };
+        for (const auto& p : kMap) {
+            if (s.contains(QLatin1String(p.needle))) return QString::fromLatin1(p.msg);
+        }
+        return s;
+    }
 
     std::unique_ptr<bmap::BmapConnection> conn_;
     std::mutex mutex_;

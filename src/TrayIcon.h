@@ -37,9 +37,13 @@ private slots:
 
 private:
     void buildMenu();
+    void updateTooltip();
+    void showStatusNotification();
+    QStringList statusLines() const;
 
     QMenu* menu_;
-    QAction* headerAction_;
+    QMenu* headerMenu_;
+    QAction* renameAction_;
     QAction* batteryAction_;
 
     QMenu* aboutMenu_;
@@ -70,4 +74,6 @@ private:
 
     Settings settings_;
     DeviceState lastState_;
+    bool reconnectInFlight_ = false;
+    bool workerBusy_ = false;
 };
