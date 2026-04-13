@@ -54,6 +54,11 @@ private:
     ModeWindow* modeWindow_;
     EqWindow* eqWindow_;
 
+    // Hidden widget used solely as a parent for transient modal dialogs
+    // (e.g. rename). TrayIcon itself is a QObject, not a QWidget, so dialogs
+    // spawned from menu actions would otherwise be parentless. Never shown.
+    QWidget* dialogAnchor_;
+
     QMenu* sidetoneMenu_;
     QActionGroup* sidetoneGroup_;
 

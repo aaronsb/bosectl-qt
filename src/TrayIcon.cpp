@@ -14,6 +14,7 @@ TrayIcon::TrayIcon(QObject* parent)
     , ncWindow_(new NcWindow)
     , modeWindow_(new ModeWindow)
     , eqWindow_(new EqWindow)
+    , dialogAnchor_(new QWidget)
     , worker_(new BmapWorker)
     , pollTimer_(new QTimer(this))
 {
@@ -99,10 +100,12 @@ TrayIcon::TrayIcon(QObject* parent)
 
     workerThread_.start();
 
-    // Poll status
+    // Poll status. Skip while the worker is busy so a reconnect (with its
+    // settle delay + retries) doesn't get trailed by a queued refresh that
+    // fires immediately after it completes.
     connect(pollTimer_, &QTimer::timeout, this, [this] {
-        if (lastState_.connected)
-            QMetaObject::invokeMethod(worker_, "refresh", Qt::QueuedConnection);
+        if (!lastState_.connected || workerBusy_) return;
+        QMetaObject::invokeMethod(worker_, "refresh", Qt::QueuedConnection);
     });
     pollTimer_->start(settings_.pollInterval() * 1000);
 
@@ -137,6 +140,7 @@ TrayIcon::~TrayIcon() {
     delete ncWindow_;
     delete eqWindow_;
     delete modeWindow_;
+    delete dialogAnchor_;
 }
 
 void TrayIcon::buildMenu() {
@@ -150,8 +154,13 @@ void TrayIcon::buildMenu() {
     renameAction_ = headerMenu_->addAction("Rename...", this, [this] {
         if (!lastState_.connected) return;
         bool ok = false;
+        // Parent the dialog to dialogAnchor_ rather than nullptr. QInputDialog
+        // creates a top-level modal QDialog (xdg_toplevel on Wayland), so the
+        // xdg_popup parenting constraint that bit us for QMenu::popup() does
+        // not apply here — but giving Qt a real QWidget parent gives us a
+        // proper object tree and sidesteps any future compositor ambiguity.
         QString name = QInputDialog::getText(
-            nullptr, "Rename Headphones",
+            dialogAnchor_, "Rename Headphones",
             "New name:", QLineEdit::Normal,
             lastState_.deviceName, &ok);
         if (!ok) return;
@@ -434,11 +443,17 @@ void TrayIcon::onModeDetailsReady(QList<ModeInfo> modes, uint8_t activeIdx) {
 
 void TrayIcon::onError(QString message) {
     qCWarning(lcTray) << "error:" << message;
+    // Belt-and-suspenders: any terminal event of a connect attempt clears the
+    // in-flight guard. Relying only on onStatusReady would silently leak the
+    // flag if a future code path ever emitted error() without a trailing
+    // statusReady().
+    reconnectInFlight_ = false;
     showMessage("bosectl", message, QSystemTrayIcon::Warning, 3000);
 }
 
 void TrayIcon::onDisconnected() {
     qCInfo(lcTray) << "disconnected signal from worker";
+    reconnectInFlight_ = false;
     lastState_ = DeviceState{};
     onStatusReady(lastState_);
 }

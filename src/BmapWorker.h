@@ -71,6 +71,10 @@ signals:
 
 public slots:
     void connectDevice(const QString& mac, const QString& deviceType, bool announceError) {
+        // Declaration order matters: BusyGuard is constructed (busy=true) before
+        // we take the lock, and its destructor runs AFTER lock_guard's, so
+        // busy=false fires once the mutex is released. Any queued worker slot
+        // waiting on the mutex sees a clean "released, not busy" state.
         BusyGuard guard(this);
         qCInfo(lcWorker) << "connectDevice: mac=" << (mac.isEmpty() ? "<auto>" : mac)
                          << "type=" << (deviceType.isEmpty() ? "<auto>" : deviceType)
@@ -356,6 +360,13 @@ private:
 
     // Translate kernel errno strings from libbmap's "Failed to connect ...:"
     // wrapper into messages a user can actually act on.
+    //
+    // Contract: libbmap (lib/bosectl/cpp/src/transport.cpp) wraps connect
+    // failures as "Failed to connect to <mac>: <strerror(errno)>". If that
+    // format ever changes, or if strerror() becomes localized, this matcher
+    // falls through to the raw text — still correct, just less friendly.
+    // The needles are substrings, not prefixes, so wrapper-text changes only
+    // cost us the translation, not the error surface.
     static QString friendlyConnectError(const std::string& raw) {
         const QString s = QString::fromStdString(raw);
         struct Pair { const char* needle; const char* msg; };
