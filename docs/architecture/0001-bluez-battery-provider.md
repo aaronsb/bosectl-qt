@@ -52,6 +52,46 @@ The implementation lives in a new `BluezBatteryProvider` class that the
 surface out of `BmapWorker` itself, which should stay focused on the BMAP
 protocol.
 
+## Placement — bosectl-qt, not upstream bosectl
+
+This decision explicitly places the Battery Provider implementation in
+**bosectl-qt** and not in the upstream `bosectl` submodule, even though the
+battery data originates in the BMAP library. The reasoning:
+
+1. **Lifecycle mismatch.** BlueZ's Battery Provider API is a persistent-
+   service pattern: you register, BlueZ calls `GetManagedObjects()` on your
+   exported object, subscribes to `InterfacesAdded`/`InterfacesRemoved`
+   signals, and reads `Percentage` over time. The registration only has
+   meaning while a process is alive to answer those calls. Upstream
+   `bosectl` is a one-shot CLI (`bosectl battery` → read → exit); a
+   registration from it would evaporate the instant the command returned.
+   The feature only makes sense for *long-running* consumers, and
+   bosectl-qt is the only such consumer today.
+2. **Dependency creep.** Upstream bosectl is currently a clean BMAP
+   protocol implementation in C++17 with zero session-bus or GUI
+   dependencies. Adding QtDBus (or sd-bus) to it would either impose a
+   new hard dependency on every consumer or hide behind a CMake flag —
+   more surface area, more CI matrix, more packaging variants, for a
+   feature the one-shot CLI can't use.
+3. **Separation of concerns, one level up.** Inside bosectl-qt we already
+   decided that `BmapWorker` speaks BMAP and `TrayIcon` owns the D-Bus
+   surface because the worker "should stay focused on the BMAP protocol."
+   The same principle applies one level higher: the `bosectl` *library*
+   speaks BMAP; its *consumers* are responsible for telling the rest of
+   the system. Consistent reasoning, cleaner library.
+4. **No second long-running consumer yet.** If/when another persistent
+   frontend appears (a GTK version, a headless daemon, a GNOME Shell
+   helper), we will have two data points on what a shared publisher needs
+   to look like. At that point, extracting a small reusable helper —
+   either into upstream bosectl as an optional module or as a separate
+   tiny library — becomes a well-motivated refactor rather than
+   speculative abstraction. Duplicate once, extract twice.
+
+**Revisit trigger.** Open a successor ADR the moment a second long-running
+consumer of bosectl starts being built, *before* the battery publishing
+logic gets copy-pasted. Copy-paste is the failure mode to watch for — it
+means we waited too long to extract.
+
 ## Non-goals
 
 - **No "real driver" for Bose listening devices yet.** This ADR scopes
