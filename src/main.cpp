@@ -1,9 +1,11 @@
 #include <QApplication>
 #include <QCommandLineParser>
+#include <QDBusMetaType>
 #include <QLoggingCategory>
 #include <QMessageBox>
 #include <QSystemTrayIcon>
 
+#include "BluezBatteryProvider.h"
 #include "BmapWorker.h"
 #include "Logging.h"
 #include "TrayIcon.h"
@@ -38,6 +40,12 @@ int main(int argc, char* argv[]) {
     qRegisterMetaType<QStringList>("QStringList");
     qRegisterMetaType<ModeInfo>("ModeInfo");
     qRegisterMetaType<QList<ModeInfo>>("QList<ModeInfo>");
+
+    // QtDBus needs to know how to marshal these nested container types so
+    // ObjectManager.GetManagedObjects() and the BlueZ Battery Provider
+    // registration can round-trip a{oa{sa{sv}}} correctly.
+    qDBusRegisterMetaType<InterfaceProperties>();
+    qDBusRegisterMetaType<ManagedObjectList>();
 
     if (!QSystemTrayIcon::isSystemTrayAvailable()) {
         QMessageBox::critical(nullptr, "bosectl-qt",

@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Widgets DBus)
 
 # bmap library from bosectl submodule
 add_library(bmap STATIC
@@ -25,9 +25,10 @@ add_executable(bosectl-qt
     src/ModeWindow.cpp
     src/NcWindow.cpp
     src/Logging.cpp
+    src/BluezBatteryProvider.cpp
     resources/resources.qrc
 )
-target_link_libraries(bosectl-qt PRIVATE Qt6::Widgets bmap bluetooth)
+target_link_libraries(bosectl-qt PRIVATE Qt6::Widgets Qt6::DBus bmap bluetooth)
 target_include_directories(bosectl-qt PRIVATE src)
 
 # Install targets

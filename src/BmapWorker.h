@@ -16,6 +16,11 @@ struct EqState {
     int8_t bass = 0;
     int8_t mid = 0;
     int8_t treble = 0;
+
+    bool operator==(const EqState& o) const {
+        return bass == o.bass && mid == o.mid && treble == o.treble;
+    }
+    bool operator!=(const EqState& o) const { return !(*this == o); }
 };
 Q_DECLARE_METATYPE(EqState)
 
@@ -50,6 +55,26 @@ struct DeviceState {
     bool ancEnabled = true;
     bool windBlock = false;
     bool connected = false;
+
+    bool operator==(const DeviceState& o) const {
+        return connected == o.connected
+            && battery == o.battery
+            && cncLevel == o.cncLevel
+            && cncMax == o.cncMax
+            && multipoint == o.multipoint
+            && autoPause == o.autoPause
+            && ancEnabled == o.ancEnabled
+            && windBlock == o.windBlock
+            && mode == o.mode
+            && deviceName == o.deviceName
+            && firmware == o.firmware
+            && sidetone == o.sidetone
+            && spatial == o.spatial
+            && mac == o.mac
+            && deviceType == o.deviceType
+            && eq == o.eq;
+    }
+    bool operator!=(const DeviceState& o) const { return !(*this == o); }
 };
 Q_DECLARE_METATYPE(DeviceState)
 
@@ -126,14 +151,18 @@ public slots:
         if (announceError) {
             emit error(friendlyConnectError(lastErr));
         }
-        emit statusReady(DeviceState{});
+        lastEmittedState_ = DeviceState{};
+        emit statusReady(lastEmittedState_);
     }
 
     void refresh() {
         std::lock_guard lock(mutex_);
         if (!conn_) {
             qCDebug(lcWorker) << "refresh: no connection, skipping";
-            emit statusReady(DeviceState{});
+            if (lastEmittedState_.connected) {
+                lastEmittedState_ = DeviceState{};
+                emit statusReady(lastEmittedState_);
+            }
             return;
         }
         try {
@@ -143,6 +172,7 @@ public slots:
             qCWarning(lcWorker) << "refresh: failed:" << e.what();
             conn_.reset();
             emit error(QString::fromStdString(e.what()));
+            lastEmittedState_ = DeviceState{};
             emit disconnected();
         }
     }
@@ -336,6 +366,7 @@ public slots:
         try {
             conn_->power_off();
             conn_.reset();
+            lastEmittedState_ = DeviceState{};
             emit disconnected();
         } catch (const std::exception& e) { emit error(QString::fromStdString(e.what())); }
     }
@@ -343,6 +374,7 @@ public slots:
     void disconnect() {
         std::lock_guard lock(mutex_);
         conn_.reset();
+        lastEmittedState_ = DeviceState{};
         emit disconnected();
     }
 
@@ -389,6 +421,11 @@ private:
     QString connMac_;
     QString connDeviceType_;
 
+    // Last DeviceState we emitted via statusReady(). Lets emitStatus() skip
+    // re-emissions that would be byte-identical to the previous one, quieting
+    // the poll loop's log/UI churn when nothing has actually changed.
+    DeviceState lastEmittedState_;
+
     // Must be called with mutex_ held
     void emitModeDetails() {
         auto allModes = conn_->modes();
@@ -434,6 +471,16 @@ private:
     }
 
     void emitStatus() {
+        DeviceState ds = buildStatus();
+        if (ds == lastEmittedState_) {
+            qCDebug(lcWorker) << "emitStatus: no change, skipping";
+            return;
+        }
+        lastEmittedState_ = ds;
+        emit statusReady(ds);
+    }
+
+    DeviceState buildStatus() {
         auto s = conn_->status();
         DeviceState ds;
         ds.connected = true;
@@ -471,6 +518,6 @@ private:
             ds.spatial = "off";
         }
 
-        emit statusReady(ds);
+        return ds;
     }
 };
