@@ -78,6 +78,14 @@ struct DeviceState {
 };
 Q_DECLARE_METATYPE(DeviceState)
 
+// Sentinel: catch the case where a future field is added to DeviceState and
+// the operator== above isn't updated to compare it. sizeof is not a perfect
+// proxy (alignment padding can absorb small adds), but it catches the
+// common cases — a new QString, bool, or integer field will move the size.
+// If this fires, update both the struct footprint and operator==.
+static_assert(sizeof(DeviceState) <= 256,
+              "DeviceState grew: update operator== alongside the new field");
+
 // Runs all blocking bmap I/O on a dedicated thread.
 // The GUI thread queues requests via slots; results come back as signals.
 class BmapWorker : public QObject {

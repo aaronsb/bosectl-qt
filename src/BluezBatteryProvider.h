@@ -93,6 +93,14 @@ private:
     QString currentMac_;
     QDBusObjectPath registeredAdapter_;  // empty if not registered
 
+    // Bounded timeout for synchronous D-Bus calls to bluez. Local system bus
+    // calls normally return in single-digit milliseconds; this only bites in
+    // failure scenarios (bluez hung, disk lag, etc.) where we'd rather block
+    // briefly on the main thread than freeze for QtDBus's default 25 seconds.
+    // If this upper bound ever matters in practice, consider a full
+    // QDBusPendingCall-based state machine — see PR #2 review notes.
+    static constexpr int kDbusCallTimeoutMs = 3000;
+
     static constexpr const char* kProviderPath = "/com/bockelie/bosectl_qt/battery";
     static constexpr const char* kChildPath = "/com/bockelie/bosectl_qt/battery/dev";
     static constexpr const char* kBluezService = "org.bluez";

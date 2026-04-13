@@ -36,10 +36,13 @@ ObjectManagerAdaptor::ObjectManagerAdaptor(BluezBatteryProvider* parent)
     : QDBusAbstractAdaptor(parent)
     , provider_(parent)
 {
-    setAutoRelaySignals(true);
-    // Relay provider's Qt signals to the D-Bus signals. setAutoRelaySignals
-    // handles this as long as the method signatures match (they do, via the
-    // InterfacesAdded/Removed naming on both sides).
+    // We do NOT call setAutoRelaySignals(true): the provider's Qt signals use
+    // lowercase-leading names (interfacesAdded/Removed) while the D-Bus-facing
+    // adaptor signals use the capital-leading wire names BlueZ expects
+    // (InterfacesAdded/Removed). Auto-relay matches by name+signature and
+    // would find nothing, so the explicit QObject::connects below are the
+    // actual relay — which means enabling auto-relay also would have been
+    // dead code at best and a doubled signal at worst.
     QObject::connect(provider_, &BluezBatteryProvider::interfacesAdded,
                      this, &ObjectManagerAdaptor::InterfacesAdded);
     QObject::connect(provider_, &BluezBatteryProvider::interfacesRemoved,
@@ -71,7 +74,7 @@ BluezBatteryProvider::BluezBatteryProvider(QObject* parent)
                           << ":" << bus_.lastError().message();
         return;
     }
-    qCInfo(lcDbus) << "provider root exported at" << kProviderPath;
+    qCDebug(lcDbus) << "provider root exported at" << kProviderPath;
 }
 
 BluezBatteryProvider::~BluezBatteryProvider() {
@@ -95,25 +98,31 @@ void BluezBatteryProvider::publish(const QString& mac, const QString& deviceType
                                    uint8_t percentage) {
     if (!bus_.isConnected()) return;
 
+    // Normalize MAC to uppercase for storage and comparison. BlueZ returns
+    // Device1.Address in uppercase, and callers may pass either case from
+    // BMAP's connection state — keeping them in one canonical form prevents
+    // the fast-path compare from false-negativing on case differences and
+    // forcing a re-registration cycle every poll.
+    const QString normalizedMac = mac.toUpper();
+
     // If this is a new device (or our first publish), resolve paths, export
     // the child, and register with bluez. Otherwise just update percentage
     // and notify via PropertiesChanged.
-    if (mac == currentMac_ && child_ && !registeredAdapter_.path().isEmpty()) {
+    if (normalizedMac == currentMac_ && child_ && !registeredAdapter_.path().isEmpty()) {
         if (child_->percentage() == percentage) return;  // no-op
         child_->setPercentage(percentage);
         emitPercentageChanged(percentage);
-        qCDebug(lcDbus) << "battery update:" << percentage << "% for" << mac;
+        qCDebug(lcDbus) << "battery update:" << percentage << "% for" << normalizedMac;
         return;
     }
 
     // Device changed (or first publish) — tear down any stale state first.
     clear();
-    currentMac_ = mac;
 
     QDBusObjectPath adapterPath;
     QDBusObjectPath devicePath;
-    if (!resolveBluezPaths(mac, adapterPath, devicePath)) {
-        qCWarning(lcDbus) << "could not resolve bluez paths for" << mac
+    if (!resolveBluezPaths(normalizedMac, adapterPath, devicePath)) {
+        qCWarning(lcDbus) << "could not resolve bluez paths for" << normalizedMac
                           << "; battery will not be published system-wide";
         return;
     }
@@ -123,8 +132,12 @@ void BluezBatteryProvider::publish(const QString& mac, const QString& deviceType
         unexportChild();
         return;
     }
+    // Only commit state after every step succeeds so a mid-publish failure
+    // leaves us fully idle (no half-registered registration, no stale
+    // currentMac_ that would block a retry on the next poll).
+    currentMac_ = normalizedMac;
     registeredAdapter_ = adapterPath;
-    qCInfo(lcDbus) << "registered battery provider for" << mac
+    qCInfo(lcDbus) << "registered battery provider for" << normalizedMac
                    << "(" << deviceType << ")"
                    << "on adapter" << adapterPath.path()
                    << "at" << percentage << "%";
@@ -150,7 +163,7 @@ bool BluezBatteryProvider::resolveBluezPaths(const QString& mac,
         QStringLiteral("/"),
         QString::fromLatin1(kObjectManagerIface),
         QStringLiteral("GetManagedObjects"));
-    QDBusMessage reply = bus_.call(call);
+    QDBusMessage reply = bus_.call(call, QDBus::Block, kDbusCallTimeoutMs);
     if (reply.type() != QDBusMessage::ReplyMessage) {
         qCWarning(lcDbus) << "GetManagedObjects on bluez failed:" << reply.errorMessage();
         return false;
@@ -186,9 +199,15 @@ void BluezBatteryProvider::exportChild(const QDBusObjectPath& devicePath,
                                        const QString& deviceType,
                                        uint8_t percentage) {
     child_ = new BatteryProviderObject(devicePath, deviceType, percentage, this);
+    // ExportAllProperties alone is sufficient: org.bluez.BatteryProvider1 is
+    // a properties-only interface, so the child has no slots to export. The
+    // Q_CLASSINFO("D-Bus Interface", ...) on BatteryProviderObject makes the
+    // properties appear under that interface name, which `busctl introspect
+    // org.bluez /org/bluez/hci0/dev_<MAC>` confirms by showing the
+    // re-exported org.bluez.Battery1.Percentage. Dropping ExportAllSlots
+    // prevents any future slot additions from leaking onto the bus.
     if (!bus_.registerObject(QString::fromLatin1(kChildPath), child_,
-                             QDBusConnection::ExportAllProperties
-                             | QDBusConnection::ExportAllSlots)) {
+                             QDBusConnection::ExportAllProperties)) {
         qCWarning(lcDbus) << "failed to export battery child at" << kChildPath
                           << ":" << bus_.lastError().message();
         delete child_;
@@ -217,7 +236,7 @@ bool BluezBatteryProvider::registerWithBluez(const QDBusObjectPath& adapterPath)
         QString::fromLatin1(kBatteryProviderMgr1Iface),
         QStringLiteral("RegisterBatteryProvider"));
     call << QVariant::fromValue(QDBusObjectPath(QString::fromLatin1(kProviderPath)));
-    QDBusMessage reply = bus_.call(call);
+    QDBusMessage reply = bus_.call(call, QDBus::Block, kDbusCallTimeoutMs);
     if (reply.type() != QDBusMessage::ReplyMessage) {
         qCWarning(lcDbus) << "RegisterBatteryProvider on" << adapterPath.path()
                           << "failed:" << reply.errorMessage();
@@ -233,7 +252,7 @@ void BluezBatteryProvider::unregisterFromBluez() {
         QString::fromLatin1(kBatteryProviderMgr1Iface),
         QStringLiteral("UnregisterBatteryProvider"));
     call << QVariant::fromValue(QDBusObjectPath(QString::fromLatin1(kProviderPath)));
-    QDBusMessage reply = bus_.call(call);
+    QDBusMessage reply = bus_.call(call, QDBus::Block, kDbusCallTimeoutMs);
     if (reply.type() != QDBusMessage::ReplyMessage) {
         qCWarning(lcDbus) << "UnregisterBatteryProvider failed:" << reply.errorMessage();
     } else {
