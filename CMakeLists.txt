@@ -24,6 +24,7 @@ add_executable(bosectl-qt
     src/EqWindow.cpp
     src/ModeWindow.cpp
     src/NcWindow.cpp
+    src/Logging.cpp
     resources/resources.qrc
 )
 target_link_libraries(bosectl-qt PRIVATE Qt6::Widgets bmap bluetooth)

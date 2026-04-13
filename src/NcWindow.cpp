@@ -1,5 +1,7 @@
 #include "NcWindow.h"
 
+#include "Logging.h"
+
 NcWindow::NcWindow(QWidget* parent)
     : QWidget(parent, Qt::Window)
 {
@@ -75,6 +77,7 @@ NcWindow::NcWindow(QWidget* parent)
 
     // Apply button sends the current slider value
     connect(applyBtn, &QPushButton::clicked, this, [this] {
+        qCInfo(lcUi) << "NC: apply clicked; level=" << slider_->value();
         emit cncChanged(slider_->value());
     });
 

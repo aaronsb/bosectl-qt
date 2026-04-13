@@ -37,9 +37,13 @@ private slots:
 
 private:
     void buildMenu();
+    void updateTooltip();
+    void showStatusNotification();
+    QStringList statusLines() const;
 
     QMenu* menu_;
-    QAction* headerAction_;
+    QMenu* headerMenu_;
+    QAction* renameAction_;
     QAction* batteryAction_;
 
     QMenu* aboutMenu_;
@@ -49,6 +53,11 @@ private:
     NcWindow* ncWindow_;
     ModeWindow* modeWindow_;
     EqWindow* eqWindow_;
+
+    // Hidden widget used solely as a parent for transient modal dialogs
+    // (e.g. rename). TrayIcon itself is a QObject, not a QWidget, so dialogs
+    // spawned from menu actions would otherwise be parentless. Never shown.
+    QWidget* dialogAnchor_;
 
     QMenu* sidetoneMenu_;
     QActionGroup* sidetoneGroup_;
@@ -70,4 +79,6 @@ private:
 
     Settings settings_;
     DeviceState lastState_;
+    bool reconnectInFlight_ = false;
+    bool workerBusy_ = false;
 };

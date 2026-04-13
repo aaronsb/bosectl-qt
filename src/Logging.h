@@ -1,0 +1,7 @@
+#pragma once
+
+#include <QLoggingCategory>
+
+Q_DECLARE_LOGGING_CATEGORY(lcTray)
+Q_DECLARE_LOGGING_CATEGORY(lcWorker)
+Q_DECLARE_LOGGING_CATEGORY(lcUi)

@@ -3,7 +3,10 @@
 #include <QApplication>
 #include <QFont>
 #include <QIcon>
+#include <QInputDialog>
 #include <QMessageBox>
+
+#include "Logging.h"
 
 TrayIcon::TrayIcon(QObject* parent)
     : QSystemTrayIcon(parent)
@@ -11,6 +14,7 @@ TrayIcon::TrayIcon(QObject* parent)
     , ncWindow_(new NcWindow)
     , modeWindow_(new ModeWindow)
     , eqWindow_(new EqWindow)
+    , dialogAnchor_(new QWidget)
     , worker_(new BmapWorker)
     , pollTimer_(new QTimer(this))
 {
@@ -25,12 +29,18 @@ TrayIcon::TrayIcon(QObject* parent)
     connect(&workerThread_, &QThread::finished, worker_, &QObject::deleteLater);
 
     // Worker signals
+    // Left click → OS notification with the current status summary. Going
+    // through showMessage() routes via the org.freedesktop.Notifications
+    // service, which works on Wayland where we can't create a local popup
+    // without a parented window.
+    connect(this, &QSystemTrayIcon::activated, this,
+            [this](QSystemTrayIcon::ActivationReason reason) {
+        if (reason == QSystemTrayIcon::Trigger) showStatusNotification();
+    });
+
     connect(worker_, &BmapWorker::busy, this, [this](bool working) {
-        if (working) {
-            setToolTip(toolTip().split(" [")[0] + " [working...]");
-        } else {
-            setToolTip(toolTip().split(" [")[0]);
-        }
+        workerBusy_ = working;
+        updateTooltip();
         ncWindow_->setBusy(working);
         eqWindow_->setBusy(working);
         modeWindow_->setBusy(working);
@@ -90,18 +100,36 @@ TrayIcon::TrayIcon(QObject* parent)
 
     workerThread_.start();
 
-    // Poll status
+    // Poll status. Skip while the worker is busy so a reconnect (with its
+    // settle delay + retries) doesn't get trailed by a queued refresh that
+    // fires immediately after it completes.
     connect(pollTimer_, &QTimer::timeout, this, [this] {
-        if (lastState_.connected)
-            QMetaObject::invokeMethod(worker_, "refresh", Qt::QueuedConnection);
+        if (!lastState_.connected || workerBusy_) return;
+        QMetaObject::invokeMethod(worker_, "refresh", Qt::QueuedConnection);
     });
     pollTimer_->start(settings_.pollInterval() * 1000);
 
-    // Auto-connect on startup
-    if (settings_.autoConnect()) {
+    // When the user opens the tray menu while disconnected, try to (re)connect.
+    // BT drop/reconnect while the app sits in the tray would otherwise leave
+    // us dormant since the poll timer only ticks on a live connection.
+    connect(menu_, &QMenu::aboutToShow, this, [this] {
+        if (lastState_.connected || reconnectInFlight_) return;
+        qCInfo(lcTray) << "menu opened while disconnected; attempting reconnect to"
+                       << settings_.lastMac();
+        reconnectInFlight_ = true;
         QMetaObject::invokeMethod(worker_, "connectDevice", Qt::QueuedConnection,
                                   Q_ARG(QString, settings_.lastMac()),
-                                  Q_ARG(QString, settings_.lastDeviceType()));
+                                  Q_ARG(QString, settings_.lastDeviceType()),
+                                  Q_ARG(bool, false));  // silent: don't popup on failure
+    });
+
+    // Auto-connect on startup
+    if (settings_.autoConnect()) {
+        qCInfo(lcTray) << "auto-connect on startup to" << settings_.lastMac();
+        QMetaObject::invokeMethod(worker_, "connectDevice", Qt::QueuedConnection,
+                                  Q_ARG(QString, settings_.lastMac()),
+                                  Q_ARG(QString, settings_.lastDeviceType()),
+                                  Q_ARG(bool, false));  // silent: don't popup on failure
     }
 }
 
@@ -112,14 +140,37 @@ TrayIcon::~TrayIcon() {
     delete ncWindow_;
     delete eqWindow_;
     delete modeWindow_;
+    delete dialogAnchor_;
 }
 
 void TrayIcon::buildMenu() {
     // ── Header ──────────────────────────────────────────────────────────────
-    headerAction_ = menu_->addAction("Bose Headphones");
-    QFont boldFont = headerAction_->font();
+    // Device name is a submenu so we can hang actions (Rename...) off it.
+    headerMenu_ = menu_->addMenu("Bose Headphones");
+    QFont boldFont = headerMenu_->menuAction()->font();
     boldFont.setBold(true);
-    headerAction_->setFont(boldFont);
+    headerMenu_->menuAction()->setFont(boldFont);
+
+    renameAction_ = headerMenu_->addAction("Rename...", this, [this] {
+        if (!lastState_.connected) return;
+        bool ok = false;
+        // Parent the dialog to dialogAnchor_ rather than nullptr. QInputDialog
+        // creates a top-level modal QDialog (xdg_toplevel on Wayland), so the
+        // xdg_popup parenting constraint that bit us for QMenu::popup() does
+        // not apply here — but giving Qt a real QWidget parent gives us a
+        // proper object tree and sidesteps any future compositor ambiguity.
+        QString name = QInputDialog::getText(
+            dialogAnchor_, "Rename Headphones",
+            "New name:", QLineEdit::Normal,
+            lastState_.deviceName, &ok);
+        if (!ok) return;
+        name = name.trimmed();
+        if (name.isEmpty() || name == lastState_.deviceName) return;
+        qCInfo(lcTray) << "user renaming headphones to" << name;
+        QMetaObject::invokeMethod(worker_, "setName", Qt::QueuedConnection,
+                                  Q_ARG(QString, name));
+    });
+    renameAction_->setEnabled(false);
 
     batteryAction_ = menu_->addAction("Battery: --");
 
@@ -233,16 +284,30 @@ void TrayIcon::buildMenu() {
 // ── Slots ───────────────────────────────────────────────────────────────────
 
 void TrayIcon::onStatusReady(DeviceState state) {
+    const bool wasConnected = lastState_.connected;
     lastState_ = state;
+    reconnectInFlight_ = false;
+
+    if (state.connected && !wasConnected) {
+        qCInfo(lcTray) << "connected:" << state.deviceName
+                       << "fw" << state.firmware
+                       << "battery" << state.battery << "%";
+    } else if (!state.connected && wasConnected) {
+        qCInfo(lcTray) << "device is now disconnected";
+    } else if (state.connected) {
+        qCDebug(lcTray) << "status update: battery" << state.battery
+                        << "mode" << state.mode;
+    }
 
     if (!state.connected) {
-        setToolTip("bosectl - Disconnected");
-        headerAction_->setText("Bose Headphones (disconnected)");
+        headerMenu_->setTitle("Bose Headphones (disconnected)");
+        renameAction_->setEnabled(false);
         batteryAction_->setText("Battery: --");
         firmwareAction_->setText("Firmware: --");
         macAction_->setText("MAC: --");
         connectAction_->setText("Connect");
         powerOffAction_->setEnabled(false);
+        updateTooltip();
         return;
     }
 
@@ -257,9 +322,8 @@ void TrayIcon::onStatusReady(DeviceState state) {
     settings_.setLastSidetone(state.sidetone);
     settings_.setLastSpatial(state.spatial);
 
-    setToolTip(QString("%1 - %2% - %3").arg(state.deviceName)
-               .arg(state.battery).arg(state.mode));
-    headerAction_->setText(state.deviceName);
+    headerMenu_->setTitle(state.deviceName);
+    renameAction_->setEnabled(true);
 
     if (state.battery <= 15)
         batteryAction_->setText(QString("Battery: %1% \u26a0").arg(state.battery));
@@ -308,6 +372,65 @@ void TrayIcon::onStatusReady(DeviceState state) {
         eqWindow_->setCurrentEq(state.eq.bass, state.eq.mid, state.eq.treble);
         eqWindow_->setSavedEq(state.eq.bass, state.eq.mid, state.eq.treble);
     }
+
+    updateTooltip();
+}
+
+QStringList TrayIcon::statusLines() const {
+    if (!lastState_.connected) {
+        return {workerBusy_ ? QStringLiteral("Connecting…")
+                            : QStringLiteral("Disconnected")};
+    }
+
+    const DeviceState& s = lastState_;
+
+    auto signedNum = [](int v) {
+        return v > 0 ? QString("+%1").arg(v)
+             : v < 0 ? QString::number(v)
+                     : QString("0");
+    };
+
+    auto cap = [](QString v) {
+        if (v.isEmpty()) return QString("—");
+        v[0] = v[0].toUpper();
+        return v;
+    };
+
+    QStringList lines;
+    lines << QString("%1 — %2%%3")
+                 .arg(s.deviceName)
+                 .arg(s.battery)
+                 .arg(workerBusy_ ? QStringLiteral(" · working…") : QString());
+    lines << QString("Mode: %1").arg(s.mode.isEmpty() ? QStringLiteral("—") : s.mode);
+
+    QString ncBits = QString("ANC: %1").arg(s.ancEnabled ? "on" : "off");
+    if (s.ancEnabled) ncBits += QString(" · NC %1/%2").arg(s.cncLevel).arg(s.cncMax);
+    ncBits += QString(" · Wind: %1").arg(s.windBlock ? "on" : "off");
+    lines << ncBits;
+
+    lines << QString("Spatial: %1").arg(cap(s.spatial));
+    lines << QString("EQ: B %1 · M %2 · T %3")
+                 .arg(signedNum(s.eq.bass))
+                 .arg(signedNum(s.eq.mid))
+                 .arg(signedNum(s.eq.treble));
+    lines << QString("Sidetone: %1 · Multipoint: %2 · Auto-pause: %3")
+                 .arg(cap(s.sidetone))
+                 .arg(s.multipoint ? "on" : "off")
+                 .arg(s.autoPause ? "on" : "off");
+    return lines;
+}
+
+void TrayIcon::updateTooltip() {
+    setToolTip(statusLines().join(QChar('\n')));
+}
+
+void TrayIcon::showStatusNotification() {
+    const auto lines = statusLines();
+    if (lines.isEmpty()) return;
+    // First line (device name + battery) is the title; the rest is the body.
+    const QString title = lines.first();
+    const QString body = lines.mid(1).join(QChar('\n'));
+    showMessage(title, body, QSystemTrayIcon::NoIcon, 5000);
 }
 
 void TrayIcon::onModesReady(QStringList) {
@@ -319,10 +442,18 @@ void TrayIcon::onModeDetailsReady(QList<ModeInfo> modes, uint8_t activeIdx) {
 }
 
 void TrayIcon::onError(QString message) {
+    qCWarning(lcTray) << "error:" << message;
+    // Belt-and-suspenders: any terminal event of a connect attempt clears the
+    // in-flight guard. Relying only on onStatusReady would silently leak the
+    // flag if a future code path ever emitted error() without a trailing
+    // statusReady().
+    reconnectInFlight_ = false;
     showMessage("bosectl", message, QSystemTrayIcon::Warning, 3000);
 }
 
 void TrayIcon::onDisconnected() {
+    qCInfo(lcTray) << "disconnected signal from worker";
+    reconnectInFlight_ = false;
     lastState_ = DeviceState{};
     onStatusReady(lastState_);
 }
@@ -362,11 +493,14 @@ void TrayIcon::onAutoPauseToggled(bool checked) {
 }
 
 void TrayIcon::onConnectClicked() {
+    qCInfo(lcTray) << "user clicked Connect; target" << settings_.lastMac();
     QMetaObject::invokeMethod(worker_, "connectDevice", Qt::QueuedConnection,
                               Q_ARG(QString, settings_.lastMac()),
-                              Q_ARG(QString, settings_.lastDeviceType()));
+                              Q_ARG(QString, settings_.lastDeviceType()),
+                              Q_ARG(bool, true));  // loud: user asked, tell them if it fails
 }
 
 void TrayIcon::onPowerOffClicked() {
+    qCInfo(lcTray) << "user clicked Power Off";
     QMetaObject::invokeMethod(worker_, "powerOff", Qt::QueuedConnection);
 }

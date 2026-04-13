@@ -3,6 +3,8 @@
 #include <QInputDialog>
 #include <QFont>
 
+#include "Logging.h"
+
 ModeWindow::ModeWindow(QWidget* parent)
     : QWidget(parent, Qt::Window)
 {
@@ -56,6 +58,7 @@ void ModeWindow::onModeSelected(int row) {
 
 void ModeWindow::onActivateClicked() {
     if (selectedRow_ < 0 || selectedRow_ >= modes_.size()) return;
+    qCInfo(lcUi) << "Mode: activate clicked;" << modes_[selectedRow_].name;
     emit activateMode(modes_[selectedRow_].name);
 }
 
@@ -66,11 +69,16 @@ void ModeWindow::onSaveClicked() {
 
     QString name = nameEdit_->text().trimmed();
     if (name.isEmpty()) {
+        qCWarning(lcUi) << "Mode: save rejected; empty name";
         QMessageBox::warning(this, "bosectl", "Mode name cannot be empty.");
         return;
     }
 
     uint8_t spatial = spatialCombo_->currentIndex();
+    qCInfo(lcUi) << "Mode: save clicked; idx=" << mode.idx << "name=" << name
+                 << "cnc=" << cncSlider_->value() << "spatial=" << spatial
+                 << "wind=" << windBlockCheck_->isChecked()
+                 << "anc=" << ancToggleCheck_->isChecked();
     emit saveMode(mode.idx, name,
                   static_cast<uint8_t>(cncSlider_->value()),
                   spatial,
@@ -87,7 +95,10 @@ void ModeWindow::onDeleteClicked() {
         QString("Delete mode \"%1\"?").arg(mode.name),
         QMessageBox::Yes | QMessageBox::No);
     if (reply == QMessageBox::Yes) {
+        qCInfo(lcUi) << "Mode: delete confirmed;" << mode.name;
         emit deleteMode(mode.name);
+    } else {
+        qCInfo(lcUi) << "Mode: delete cancelled;" << mode.name;
     }
 }
 
@@ -95,9 +106,16 @@ void ModeWindow::onNewClicked() {
     bool ok;
     QString name = QInputDialog::getText(this, "New Mode", "Mode name:",
                                           QLineEdit::Normal, "", &ok);
-    if (!ok || name.trimmed().isEmpty()) return;
+    if (!ok || name.trimmed().isEmpty()) {
+        qCInfo(lcUi) << "Mode: new cancelled or empty name";
+        return;
+    }
 
     uint8_t spatial = spatialCombo_->currentIndex();
+    qCInfo(lcUi) << "Mode: new clicked; name=" << name.trimmed()
+                 << "cnc=" << cncSlider_->value() << "spatial=" << spatial
+                 << "wind=" << windBlockCheck_->isChecked()
+                 << "anc=" << ancToggleCheck_->isChecked();
     emit createMode(name.trimmed(),
                     static_cast<uint8_t>(cncSlider_->value()),
                     spatial,
