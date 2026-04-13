@@ -76,11 +76,51 @@ AUR_GIT_URL := ssh://aur@aur.archlinux.org/bosectl-qt-git.git
         bump-version release aur-publish cut-release \
         _check-version _check-pkgbuild-ready
 
-# Default: just build. A user who types `make` expects something to compile.
-.DEFAULT_GOAL := build
+# Default: show help. Typing `make` with no target lands on a usage screen
+# rather than silently starting a build — discoverable, and the frequent
+# "make build / run / clean" flow is one extra word of typing.
+.DEFAULT_GOAL := help
 
 help:
-	@awk 'BEGIN{p=1} /^# ──/{print; next} /^#/{print; next} /^[a-zA-Z_-]+:/ && p {print ""; print $$0; next}' $(MAKEFILE_LIST) | head -60
+	@printf '\n'
+	@printf '  \033[1mbosectl-qt\033[0m — Qt6 system tray app for Bose headphones (BMAP)\n'
+	@printf '\n'
+	@printf '  \033[1mDaily development\033[0m\n'
+	@printf '    make build         cmake configure + compile to ./build/\n'
+	@printf '    make run           build, then run ./build/bosectl-qt\n'
+	@printf '    make run-verbose   build, then run with --verbose logging\n'
+	@printf '    make clean         rm -rf ./build/\n'
+	@printf '\n'
+	@printf '  \033[1mCutting a release\033[0m (bosectl-qt tracks upstream bosectl major/minor)\n'
+	@printf '    make cut-release VERSION=X.Y.Z   full flow: bump → release → AUR\n'
+	@printf '\n'
+	@printf '    — or, decomposed if you want to pause between steps —\n'
+	@printf '    make bump-version VERSION=X.Y.Z  rewrite version strings in source\n'
+	@printf '                                     (CMakeLists.txt, main.cpp,\n'
+	@printf '                                     TrayIcon.cpp About dialog,\n'
+	@printf '                                     PKGBUILD, PKGBUILD-git). Resets\n'
+	@printf '                                     tarball sha256 to SKIP. No commit.\n'
+	@printf '    make release VERSION=X.Y.Z       commit bump, tag vX.Y.Z, push,\n'
+	@printf '                                     gh release create, fetch tarball,\n'
+	@printf '                                     pin sha256, second commit/push.\n'
+	@printf '    make aur-publish                 clone both AUR repos, copy\n'
+	@printf '                                     PKGBUILD/PKGBUILD-git, regenerate\n'
+	@printf '                                     .SRCINFO, push master. Reads the\n'
+	@printf '                                     version from PKGBUILD.\n'
+	@printf '\n'
+	@printf '  \033[1mGotchas\033[0m\n'
+	@printf '    • AUR uses `master`, not `main`. The Makefile pushes to master.\n'
+	@printf '    • PKGBUILD pins _bosectl_commit separately — bump it by hand if\n'
+	@printf '      the lib/bosectl submodule advanced with this release.\n'
+	@printf '    • aur-publish refuses to run if PKGBUILD'"'"'s first sha256 is still\n'
+	@printf '      `SKIP` — that would mean `make release` was skipped.\n'
+	@printf '\n'
+	@printf '  \033[1mPrerequisites\033[0m\n'
+	@printf '    cmake, gcc, Qt6 (base + dbus), bluez   (build)\n'
+	@printf '    gh authenticated                        (release)\n'
+	@printf '    makepkg (pacman), curl, sha256sum       (release + aur-publish)\n'
+	@printf '    SSH key loaded for aur@aur.archlinux.org (aur-publish)\n'
+	@printf '\n'
 
 # ─── Build / run ────────────────────────────────────────────────────────────
 
