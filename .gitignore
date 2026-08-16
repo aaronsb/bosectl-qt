@@ -3,3 +3,6 @@ build/
 .cache/
 compile_commands.json
 CMakeLists.txt.user
+
+# make package dry run
+/pkgbuild-check/
