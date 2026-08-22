@@ -45,5 +45,8 @@ install(FILES resources/bosectl-qt.desktop
         DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications)
 install(FILES resources/bosectl-qt.svg
         DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/scalable/apps)
+# Shipped as an example rather than into /etc/xdg/autostart, so installing
+# the package does not start a tray for every desktop user on the machine.
+# Users opt in by copying it to ~/.config/autostart/ (see README).
 install(FILES resources/bosectl-qt-autostart.desktop
-        DESTINATION /etc/xdg/autostart)
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/${PROJECT_NAME})

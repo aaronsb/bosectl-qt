@@ -1,5 +1,8 @@
 #include "TrayIcon.h"
 
+// The device's name field is 32 bytes; the library's length byte wraps past 255.
+static constexpr int kMaxDeviceNameBytes = 31;
+
 #include <QApplication>
 #include <QFont>
 #include <QIcon>
@@ -167,6 +170,11 @@ void TrayIcon::buildMenu() {
         if (!ok) return;
         name = name.trimmed();
         if (name.isEmpty() || name == lastState_.deviceName) return;
+        if (name.toUtf8().size() > kMaxDeviceNameBytes) {
+            QMessageBox::warning(dialogAnchor_, "Rename Headphones",
+                QString("Name must be at most %1 bytes of UTF-8.").arg(kMaxDeviceNameBytes));
+            return;
+        }
         qCInfo(lcTray) << "user renaming headphones to" << name;
         QMetaObject::invokeMethod(worker_, "setName", Qt::QueuedConnection,
                                   Q_ARG(QString, name));
@@ -435,8 +443,10 @@ void TrayIcon::showStatusNotification() {
     const auto lines = statusLines();
     if (lines.isEmpty()) return;
     // First line (device name + battery) is the title; the rest is the body.
-    const QString title = lines.first();
-    const QString body = lines.mid(1).join(QChar('\n'));
+    // Notification daemons render the body as markup; device-supplied names
+    // and mode names must not be able to inject tags.
+    const QString title = lines.first().toHtmlEscaped();
+    const QString body = lines.mid(1).join(QChar('\n')).toHtmlEscaped();
     showMessage(title, body, QSystemTrayIcon::NoIcon, 5000);
 }
 

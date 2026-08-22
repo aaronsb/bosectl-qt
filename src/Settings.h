@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QSettings>
+#include <algorithm>
 #include <QString>
 #include <QStandardPaths>
 #include <QDir>
@@ -49,7 +50,11 @@ public:
     void setLastSpatial(const QString& v) { settings_.setValue("audio/spatial", v); settings_.sync(); }
 
     // Poll interval in seconds
-    int pollInterval() const           { return settings_.value("general/poll_interval", 60).toInt(); }
+    // Clamped: 0 or negative would fire refresh() every event-loop turn, and
+    // large values overflow the millisecond conversion.
+    int pollInterval() const {
+        return std::clamp(settings_.value("general/poll_interval", 60).toInt(), 5, 3600);
+    }
     void setPollInterval(int v)        { settings_.setValue("general/poll_interval", v); settings_.sync(); }
 
 private:

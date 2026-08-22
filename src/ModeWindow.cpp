@@ -92,7 +92,7 @@ void ModeWindow::onDeleteClicked() {
     if (!mode.editable) return;
 
     auto reply = QMessageBox::question(this, "bosectl",
-        QString("Delete mode \"%1\"?").arg(mode.name),
+        QString("Delete mode \"%1\"?").arg(mode.name.toHtmlEscaped()),
         QMessageBox::Yes | QMessageBox::No);
     if (reply == QMessageBox::Yes) {
         qCInfo(lcUi) << "Mode: delete confirmed;" << mode.name;

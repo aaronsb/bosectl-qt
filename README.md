@@ -130,7 +130,14 @@ mock transport). Pass `-DBOSECTL_QT_BUILD_TESTS=OFF` to CMake to skip them.
 sudo cmake --install build
 ```
 
-This installs the binary to `/usr/local/bin`, the desktop file to `/usr/local/share/applications`, the icon to the hicolor theme, and an XDG autostart entry.
+This installs the binary to `/usr/local/bin`, the desktop file to `/usr/local/share/applications`, the icon to the hicolor theme, and an autostart entry under `/usr/local/share/bosectl-qt/` (Arch: `/usr/share/bosectl-qt/`).
+
+Autostart is opt-in per user:
+
+```bash
+mkdir -p ~/.config/autostart
+cp /usr/share/bosectl-qt/bosectl-qt-autostart.desktop ~/.config/autostart/
+```
 
 ## Usage
 
