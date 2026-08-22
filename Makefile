@@ -137,7 +137,7 @@ _check-version:
 	fi
 
 bump-version: _check-version
-	@echo "==> Rewriting this project'"'"'s version strings to $(VERSION)"
+	@echo "==> Rewriting the project version strings to $(VERSION)"
 	sed -i -E 's/(project\(bosectl-qt VERSION )[0-9]+\.[0-9]+\.[0-9]+/\1$(VERSION)/' CMakeLists.txt
 	sed -i -E 's/(setApplicationVersion\(")[0-9]+\.[0-9]+\.[0-9]+/\1$(VERSION)/' src/main.cpp
 	sed -i -E 's|(<p>Version )[0-9]+\.[0-9]+\.[0-9]+(</p>)|\1$(VERSION)\2|' src/TrayIcon.cpp
@@ -147,7 +147,7 @@ bump-version: _check-version
 	@echo "PKGBUILD is deliberately untouched: arch-repo owns pkgver, pkgrel and"
 	@echo "sha256sums and overwrites all three from the release."
 	@echo ""
-	@echo "Next: review with '"'"'git diff'"'"' then '"'"'make release VERSION=$(VERSION)'"'"'"
+	@echo "Next: review with git diff, then: make release VERSION=$(VERSION)"
 
 release: _check-version
 	@echo "==> Verifying clean build at $(VERSION)"
