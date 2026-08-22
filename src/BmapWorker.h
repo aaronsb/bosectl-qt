@@ -92,6 +92,51 @@ class BmapWorker : public QObject {
     Q_OBJECT
 
 public:
+    // Test seam: hand the worker a connection built on a mock transport so
+    // slots can be exercised without Bluetooth. Public so tests can reach
+    // it; production code goes through connectDevice().
+    void setConnectionForTest(std::unique_ptr<bmap::BmapConnection> conn) {
+        std::lock_guard lock(mutex_);
+        conn_ = std::move(conn);
+    }
+
+    // Build the SETGET packet that rewrites profile slot `idx` in place. Uses
+    // the device config's own builder, so 40-byte (QC Ultra 2) and 39-byte
+    // (prince, QC45) layouts each get the right payload. Existing voice-prompt
+    // bytes for the slot are carried over.
+    std::vector<uint8_t> buildModeWrite(uint8_t idx, const QString& name, uint8_t cnc,
+                                        uint8_t spatial, bool windBlock, bool ancToggle) {
+        const auto& cfg = conn_->config();
+        if (!cfg.mode_config) throw std::runtime_error("mode_config not supported");
+        if (!cfg.build_mode_config)
+            throw std::runtime_error("Profile editing not supported on this device");
+        uint8_t p1 = 0, p2 = 0;
+        for (auto& m : conn_->modes()) {
+            if (m.mode_idx == idx) { p1 = m.prompt_b1; p2 = m.prompt_b2; break; }
+        }
+        auto payload = cfg.build_mode_config(
+            idx, name.toStdString(), cnc, spatial, windBlock, ancToggle, p1, p2);
+        return bmap::bmap_packet(cfg.mode_config->fblock, cfg.mode_config->func,
+                                 bmap::Operator::SetGet, payload);
+    }
+
+    static QString friendlyConnectError(const std::string& raw) {
+        const QString s = QString::fromStdString(raw);
+        struct Pair { const char* needle; const char* msg; };
+        static constexpr Pair kMap[] = {
+            {"Host is down",              "Headphones appear to be off or out of range."},
+            {"No route to host",          "Cannot reach the headphones — are they powered on?"},
+            {"Device or resource busy",   "Bluetooth is busy — try again in a moment."},
+            {"Operation now in progress", "Connection timed out — headphones not responding."},
+            {"Connection timed out",      "Connection timed out — headphones not responding."},
+            {"Connection refused",        "Headphones refused the connection."},
+        };
+        for (const auto& p : kMap) {
+            if (s.contains(QLatin1String(p.needle))) return QString::fromUtf8(p.msg);
+        }
+        return s;
+    }
+
     explicit BmapWorker(QObject* parent = nullptr) : QObject(parent) {}
 
 signals:
@@ -324,24 +369,7 @@ public slots:
             if (idx == 255) {
                 conn_->create_profile(name.toStdString(), cnc, spatial, windBlock, ancToggle);
             } else {
-                // Write mode config directly using the internal write path
-                // We re-create the mode via create_profile style write
-                bmap::ModeConfig mc{};
-                mc.mode_idx = idx;
-                mc.name = name.toStdString();
-                mc.cnc_level = cnc;
-                mc.spatial = spatial;
-                mc.wind_block = windBlock;
-                mc.anc_toggle = ancToggle;
-
-                // Use the connection's raw write approach
-                auto addr = conn_->config().mode_config;
-                if (!addr) throw std::runtime_error("mode_config not supported");
-                auto payload = bmap::build_mode_config_40(
-                    idx, mc.name, cnc, spatial, windBlock, ancToggle);
-                auto pkt = bmap::bmap_packet(addr->fblock, addr->func,
-                                              bmap::Operator::SetGet, payload);
-                conn_->send_raw(pkt);
+                conn_->send_raw(buildModeWrite(idx, name, cnc, spatial, windBlock, ancToggle));
             }
             emitModeDetails();
         } catch (const std::exception& e) { emit error(QString::fromStdString(e.what())); }
@@ -407,22 +435,6 @@ private:
     // falls through to the raw text — still correct, just less friendly.
     // The needles are substrings, not prefixes, so wrapper-text changes only
     // cost us the translation, not the error surface.
-    static QString friendlyConnectError(const std::string& raw) {
-        const QString s = QString::fromStdString(raw);
-        struct Pair { const char* needle; const char* msg; };
-        static constexpr Pair kMap[] = {
-            {"Host is down",              "Headphones appear to be off or out of range."},
-            {"No route to host",          "Cannot reach the headphones — are they powered on?"},
-            {"Device or resource busy",   "Bluetooth is busy — try again in a moment."},
-            {"Operation now in progress", "Connection timed out — headphones not responding."},
-            {"Connection timed out",      "Connection timed out — headphones not responding."},
-            {"Connection refused",        "Headphones refused the connection."},
-        };
-        for (const auto& p : kMap) {
-            if (s.contains(QLatin1String(p.needle))) return QString::fromLatin1(p.msg);
-        }
-        return s;
-    }
 
     std::unique_ptr<bmap::BmapConnection> conn_;
     std::mutex mutex_;

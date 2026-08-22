@@ -31,6 +31,13 @@ add_executable(bosectl-qt
 target_link_libraries(bosectl-qt PRIVATE Qt6::Widgets Qt6::DBus bmap bluetooth)
 target_include_directories(bosectl-qt PRIVATE src)
 
+# Tests
+option(BOSECTL_QT_BUILD_TESTS "Build the test binaries" ON)
+if(BOSECTL_QT_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
+
 # Install targets
 include(GNUInstallDirs)
 install(TARGETS bosectl-qt RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

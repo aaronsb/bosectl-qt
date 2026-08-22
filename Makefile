@@ -10,6 +10,7 @@
 #   make build         # cmake configure + compile to ./build/
 #   make run           # build, then run ./build/bosectl-qt
 #   make run-verbose   # build, then run with --verbose logging
+#   make test          # build, then run ctest (bmap suite + app suite)
 #   make clean         # rm -rf ./build/
 #
 # ── Cutting a release ──────────────────────────────────────────────────
@@ -59,7 +60,7 @@ SRCNAME := $(or $(shell sed -n 's/^_repo=//p' PKGBUILD),$(NAME))
 # $(shell ...) and an escaped one in a regex reads as unbalanced to it.
 CURRENT_VERSION := $(shell awk '/^project.bosectl-qt VERSION/ {print $$3}' CMakeLists.txt)
 
-.PHONY: help build clean run run-verbose \
+.PHONY: help build clean run run-verbose test \
         bump-version release check package version \
         _check-version
 
@@ -119,6 +120,9 @@ run: build
 
 run-verbose: build
 	$(BIN) --verbose
+
+test: build ## Build, then run both test suites via ctest
+	ctest --test-dir $(BUILD_DIR) --output-on-failure
 
 # ─── Release ceremony ───────────────────────────────────────────────────────
 

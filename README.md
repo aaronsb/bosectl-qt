@@ -45,6 +45,12 @@ Currently verified:
 - **Bose QuietComfort Ultra Headphones**
 - **Bose QuietComfort 35 / 35 II** (via the bosectl library, untested in Qt UI)
 
+Recognised through the bosectl library, untested in the Qt UI: QuietComfort
+Headphones (`prince`), QuietComfort Earbuds (`lando`), QuietComfort 45
+(`duran`, inferred layout), Ultra Open Earbuds (`serena`, read and switch
+only). Profile editing uses each device's own ModeConfig builder; devices
+without one report "not supported" in the mode manager.
+
 Other Bose devices may work — see the [bosectl device support list](https://github.com/aaronsb/bosectl#supported-devices).
 
 ## Installation
@@ -108,6 +114,16 @@ If you forgot `--recursive`, run:
 git submodule update --init --recursive
 ```
 
+### Test
+
+```bash
+make test            # or: ctest --test-dir build --output-on-failure
+```
+
+Two binaries run: `bmap_tests` (the vendored bosectl C++ suite at the pinned
+submodule commit) and `bosectl-qt_tests` (QtTest suite for `BmapWorker` over a
+mock transport). Pass `-DBOSECTL_QT_BUILD_TESTS=OFF` to CMake to skip them.
+
 ### Install
 
 ```bash
@@ -161,10 +177,10 @@ Settings are stored in `~/.config/bosectl-qt/bosectl-qt.conf` via `QSettings`.
 ## Roadmap
 
 - [ ] Pre-built binaries: Flatpak, AppImage, Arch AUR, Debian package
-- [ ] CI builds with GitHub Actions
+- [x] CI builds with GitHub Actions
 - [ ] Button remapping UI (bmap library already supports it)
 - [ ] Voice prompts language selector
-- [ ] Extended device support (QC Ultra Earbuds, QC45, etc.) once bosectl upstream adds configs
+- [ ] Verify the Qt UI on the devices bosectl now recognises (prince, lando, QC45, Ultra Open)
 - [ ] Translations
 
 ## Credits
