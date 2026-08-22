@@ -1,8 +1,5 @@
 #include "TrayIcon.h"
 
-// The device's name field is 32 bytes; the library's length byte wraps past 255.
-static constexpr int kMaxDeviceNameBytes = 31;
-
 #include <QApplication>
 #include <QFont>
 #include <QIcon>
@@ -170,9 +167,9 @@ void TrayIcon::buildMenu() {
         if (!ok) return;
         name = name.trimmed();
         if (name.isEmpty() || name == lastState_.deviceName) return;
-        if (name.toUtf8().size() > kMaxDeviceNameBytes) {
+        if (name.toUtf8().size() > static_cast<int>(bmap::MAX_NAME_BYTES)) {
             QMessageBox::warning(dialogAnchor_, "Rename Headphones",
-                QString("Name must be at most %1 bytes of UTF-8.").arg(kMaxDeviceNameBytes));
+                QString("Name must be at most %1 bytes of UTF-8.").arg(static_cast<int>(bmap::MAX_NAME_BYTES)));
             return;
         }
         qCInfo(lcTray) << "user renaming headphones to" << name;

@@ -24,7 +24,7 @@ makedepends=(
 )
 # The bosectl submodule commit that this release is pinned to.
 # Bump along with the main pkgver when updating.
-_bosectl_commit=f0e9127a1e3d74b6517d10addc3c7e8997c5c5c7
+_bosectl_commit=615d1d92e14d58c1c4a010e25b0b58320534b5f5
 source=(
     "$pkgname-$pkgver.tar.gz::https://github.com/aaronsb/bosectl-qt/archive/v$pkgver.tar.gz"
     "bosectl::git+https://github.com/aaronsb/bosectl.git#commit=$_bosectl_commit"
