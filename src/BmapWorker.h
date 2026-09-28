@@ -140,6 +140,19 @@ public:
 
     explicit BmapWorker(QObject* parent = nullptr) : QObject(parent) {}
 
+    // The types the worker's queued slots and signals carry. Qt before 6.5
+    // cannot queue a uint8_t argument without this; TrayIcon calls it before
+    // its first invokeMethod.
+    static void registerMetaTypes() {
+        qRegisterMetaType<uint8_t>("uint8_t");
+        qRegisterMetaType<int8_t>("int8_t");
+        qRegisterMetaType<EqState>("EqState");
+        qRegisterMetaType<DeviceState>("DeviceState");
+        qRegisterMetaType<QStringList>("QStringList");
+        qRegisterMetaType<ModeInfo>("ModeInfo");
+        qRegisterMetaType<QList<ModeInfo>>("QList<ModeInfo>");
+    }
+
     // What a connect produces: the connection and the address and device
     // type it reached.
     struct Link {

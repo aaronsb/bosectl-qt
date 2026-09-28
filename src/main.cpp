@@ -35,14 +35,6 @@ int main(int argc, char* argv[]) {
         qCInfo(lcTray) << "verbose logging enabled";
     }
 
-    qRegisterMetaType<uint8_t>("uint8_t");
-    qRegisterMetaType<int8_t>("int8_t");
-    qRegisterMetaType<EqState>("EqState");
-    qRegisterMetaType<DeviceState>("DeviceState");
-    qRegisterMetaType<QStringList>("QStringList");
-    qRegisterMetaType<ModeInfo>("ModeInfo");
-    qRegisterMetaType<QList<ModeInfo>>("QList<ModeInfo>");
-
     // QtDBus needs to know how to marshal these nested container types so
     // ObjectManager.GetManagedObjects() and the BlueZ Battery Provider
     // registration can round-trip a{oa{sa{sv}}} correctly.

@@ -107,8 +107,10 @@ private slots:
     }
 
     void tooltipSummarisesDevice() {
+        // The worker's busy(false) can land just after the status it ends.
+        QTRY_COMPARE(control->Tooltip().split('\n').value(0),
+                     QString("Bose QC Ultra Headphones — 80%"));
         const QStringList lines = control->Tooltip().split('\n');
-        QCOMPARE(lines.value(0), QString("Bose QC Ultra Headphones — 80%"));
         QCOMPARE(lines.value(1), QString("Mode: quiet"));
         QCOMPARE(lines.value(2), QString("ANC: on · NC 10/10 · Wind: on"));
         QCOMPARE(lines.value(4), QString("EQ: B +2 · M 0 · T -1"));

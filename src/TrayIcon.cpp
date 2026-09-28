@@ -30,6 +30,7 @@ TrayIcon::TrayIcon(std::shared_ptr<SimDevice> sim, QObject* parent)
     , worker_(new BmapWorker)
     , pollTimer_(new QTimer(this))
 {
+    BmapWorker::registerMetaTypes();
     setIcon(QIcon(":/bosectl-qt.svg"));
     setToolTip("bosectl - Disconnected");
 
