@@ -1,4 +1,4 @@
-# Three test binaries:
+# Four test binaries:
 #   bmap_tests        — the vendored bosectl C++ suite, built against the
 #                       submodule commit this app pins. Catches a stale or
 #                       broken pin before the tray ever links it.
@@ -7,8 +7,10 @@
 #                       comparison).
 #   autostart_tests   — start-on-login entry write/remove, under
 #                       QStandardPaths test mode.
+#   help_tests        — help.md parsing, and help.md and the Help window
+#                       agreeing on the same set of ids. Runs offscreen.
 
-find_package(Qt6 REQUIRED COMPONENTS Test)
+find_package(Qt6 REQUIRED COMPONENTS Test Widgets)
 
 set(BMAP_TESTS_DIR ${CMAKE_SOURCE_DIR}/lib/bosectl/cpp/tests)
 add_executable(bmap_tests
@@ -36,3 +38,15 @@ add_executable(autostart_tests test_autostart.cpp)
 target_include_directories(autostart_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(autostart_tests PRIVATE Qt6::Core Qt6::Test)
 add_test(NAME autostart_tests COMMAND autostart_tests)
+
+# Builds in the real help.md through resources.qrc, so the drift checks run
+# against the file the app ships.
+add_executable(help_tests
+    test_help.cpp
+    ${CMAKE_SOURCE_DIR}/src/HelpWindow.cpp
+    ${CMAKE_SOURCE_DIR}/resources/resources.qrc
+)
+target_include_directories(help_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(help_tests PRIVATE Qt6::Widgets Qt6::Test)
+add_test(NAME help_tests COMMAND help_tests)
+set_tests_properties(help_tests PROPERTIES ENVIRONMENT QT_QPA_PLATFORM=offscreen)
