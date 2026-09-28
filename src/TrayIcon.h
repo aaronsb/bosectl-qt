@@ -7,6 +7,8 @@
 #include <QThread>
 #include <QTimer>
 
+#include <memory>
+
 #include "BluezBatteryProvider.h"
 #include "BmapWorker.h"
 #include "Settings.h"
@@ -15,12 +17,19 @@
 #include "ModeWindow.h"
 #include "NcWindow.h"
 
+class SimDevice;
+
 class TrayIcon : public QSystemTrayIcon {
     Q_OBJECT
 
 public:
-    explicit TrayIcon(QObject* parent = nullptr);
+    // With a SimDevice, the tray connects to it instead of Bluetooth and
+    // publishes nothing to BlueZ.
+    explicit TrayIcon(std::shared_ptr<SimDevice> sim = {}, QObject* parent = nullptr);
     ~TrayIcon() override;
+
+    // Poll the device now rather than at the next timer tick.
+    void refresh();
 
 private slots:
     void onStatusReady(DeviceState state);
@@ -81,7 +90,7 @@ private:
     QThread workerThread_;
     BmapWorker* worker_;
     QTimer* pollTimer_;
-    BluezBatteryProvider* batteryProvider_;
+    BluezBatteryProvider* batteryProvider_ = nullptr;   // none in sim mode
 
     Settings settings_;
     DeviceState lastState_;

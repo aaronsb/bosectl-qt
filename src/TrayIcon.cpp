@@ -10,6 +10,7 @@
 #include "Autostart.h"
 #include "HelpContent.h"
 #include "Logging.h"
+#include "SimDevice.h"
 
 namespace {
 // Hovering a menu entry shows the first sentence of its help.md entry, so
@@ -19,22 +20,36 @@ void setHelpTip(QAction* action, const QString& id) {
 }
 }  // namespace
 
-TrayIcon::TrayIcon(QObject* parent)
+TrayIcon::TrayIcon(std::shared_ptr<SimDevice> sim, QObject* parent)
     : QSystemTrayIcon(parent)
     , menu_(new QMenu)
     , ncWindow_(new NcWindow)
     , modeWindow_(new ModeWindow)
     , eqWindow_(new EqWindow)
     , dialogAnchor_(new QWidget)
-    , batteryProvider_(new BluezBatteryProvider(this))
     , worker_(new BmapWorker)
     , pollTimer_(new QTimer(this))
 {
+    BmapWorker::registerMetaTypes();
     setIcon(QIcon(":/bosectl-qt.svg"));
     setToolTip("bosectl - Disconnected");
 
     buildMenu();
     setContextMenu(menu_);
+
+    if (sim) {
+        // The simulated headset stands in for Bluetooth. It must not reach
+        // BlueZ either: the system bus is the real one even in a nest.
+        worker_->setConnector([sim](const QString&, const QString&) {
+            BmapWorker::Link link;
+            link.conn = std::make_unique<bmap::BmapConnection>(sim->connect(), sim->config());
+            link.mac = SimDevice::kMac;
+            link.deviceType = SimDevice::kDeviceType;
+            return link;
+        });
+    } else {
+        batteryProvider_ = new BluezBatteryProvider(this);
+    }
 
     // Move worker to its own thread
     worker_->moveToThread(&workerThread_);
@@ -354,6 +369,10 @@ void TrayIcon::buildMenu() {
     setHelpTip(menu_->addAction("Quit", qApp, &QApplication::quit), "menu.quit");
 }
 
+void TrayIcon::refresh() {
+    QMetaObject::invokeMethod(worker_, "refresh", Qt::QueuedConnection);
+}
+
 // ── Slots ───────────────────────────────────────────────────────────────────
 
 void TrayIcon::onStartOnLoginToggled(bool checked) {
@@ -395,7 +414,7 @@ void TrayIcon::onStatusReady(DeviceState state) {
         macAction_->setText("MAC: --");
         connectAction_->setText("Connect");
         powerOffAction_->setEnabled(false);
-        batteryProvider_->clear();
+        if (batteryProvider_) batteryProvider_->clear();
         updateTooltip();
         return;
     }
@@ -403,7 +422,7 @@ void TrayIcon::onStatusReady(DeviceState state) {
     // Publish battery via BlueZ so system indicators (UPower → GNOME/KDE)
     // see the reading. Safe to call every update: idempotent for identical
     // values and handles device-change transitions internally.
-    batteryProvider_->publish(state.mac, state.deviceType, state.battery);
+    if (batteryProvider_) batteryProvider_->publish(state.mac, state.deviceType, state.battery);
 
     // Save settings
     settings_.setLastMac(state.mac);

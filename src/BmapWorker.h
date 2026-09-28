@@ -140,6 +140,34 @@ public:
 
     explicit BmapWorker(QObject* parent = nullptr) : QObject(parent) {}
 
+    // The types the worker's queued slots and signals carry. Qt before 6.5
+    // cannot queue a uint8_t argument without this; TrayIcon calls it before
+    // its first invokeMethod.
+    static void registerMetaTypes() {
+        qRegisterMetaType<uint8_t>("uint8_t");
+        qRegisterMetaType<int8_t>("int8_t");
+        qRegisterMetaType<EqState>("EqState");
+        qRegisterMetaType<DeviceState>("DeviceState");
+        qRegisterMetaType<QStringList>("QStringList");
+        qRegisterMetaType<ModeInfo>("ModeInfo");
+        qRegisterMetaType<QList<ModeInfo>>("QList<ModeInfo>");
+    }
+
+    // What a connect produces: the connection and the address and device
+    // type it reached.
+    struct Link {
+        std::unique_ptr<bmap::BmapConnection> conn;
+        QString mac;
+        QString deviceType;
+    };
+    // Opens a link to (mac, deviceType); either may be empty for auto-detect.
+    // Throws on failure, with the errno text friendlyConnectError() maps.
+    using Connector = std::function<Link(const QString& mac, const QString& deviceType)>;
+
+    // Replace Bluetooth with another connector (the simulated headset).
+    // Set before the worker thread starts.
+    void setConnector(Connector c) { connector_ = std::move(c); }
+
 signals:
     void statusReady(DeviceState state);
     void modesReady(QStringList modes);
@@ -180,17 +208,10 @@ public slots:
         std::string lastErr;
         for (int attempt = 1; attempt <= kConnectMaxAttempts; ++attempt) {
             try {
-                conn_ = bmap::connect(connectMac.toStdString(), deviceType.toStdString());
-                connMac_ = connectMac;
-                if (connMac_.isEmpty()) {
-                    auto detected = bmap::find_bmap_device();
-                    if (detected) {
-                        connMac_ = QString::fromStdString(detected->first);
-                        connDeviceType_ = QString::fromStdString(detected->second);
-                    }
-                } else {
-                    connDeviceType_ = deviceType;
-                }
+                Link link = connector_(connectMac, deviceType);
+                conn_ = std::move(link.conn);
+                connMac_ = link.mac;
+                connDeviceType_ = link.deviceType;
                 qCInfo(lcWorker) << "connectDevice: success on attempt" << attempt
                                  << "mac=" << connMac_ << "type=" << connDeviceType_;
                 emitStatus();
@@ -449,6 +470,24 @@ private:
     // The needles are substrings, not prefixes, so wrapper-text changes only
     // cost us the translation, not the error surface.
 
+    // Bluetooth: bmap::connect(), and when no MAC was given, the address
+    // and type discovery settles on.
+    static Link bluetoothConnect(const QString& mac, const QString& deviceType) {
+        Link link;
+        link.conn = bmap::connect(mac.toStdString(), deviceType.toStdString());
+        link.mac = mac;
+        link.deviceType = deviceType;
+        if (link.mac.isEmpty()) {
+            auto detected = bmap::find_bmap_device();
+            if (detected) {
+                link.mac = QString::fromStdString(detected->first);
+                link.deviceType = QString::fromStdString(detected->second);
+            }
+        }
+        return link;
+    }
+
+    Connector connector_ = &BmapWorker::bluetoothConnect;
     std::unique_ptr<bmap::BmapConnection> conn_;
     std::mutex mutex_;
     QString connMac_;
