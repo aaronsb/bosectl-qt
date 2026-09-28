@@ -163,6 +163,11 @@ void SimControl::Refresh() { tray_->refresh(); }
 
 QString SimControl::Device() const { return QString::fromStdString(sim_->describe()); }
 
+void SimControl::Reset() {
+    sim_->reset();
+    tray_->refresh();
+}
+
 void SimControl::SetBattery(int pct) { sim_->setBattery(static_cast<uint8_t>(qBound(0, pct, 100))); }
 
 void SimControl::SetReachable(bool on) { sim_->setReachable(on); }

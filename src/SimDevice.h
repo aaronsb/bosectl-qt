@@ -50,6 +50,9 @@ public:
     // One request, one reply buffer (possibly several frames for a drain).
     std::vector<uint8_t> handle(const std::vector<uint8_t>& packet);
 
+    // Back to the state a new SimDevice starts in. Reachability is kept.
+    void reset();
+
     void setBattery(uint8_t pct);
     void setReachable(bool on);
     bool reachable() const;
@@ -66,22 +69,23 @@ private:
                                       const std::vector<uint8_t>& payload);
     std::vector<uint8_t> slotStatus(uint8_t idx) const;
     void applyMode(uint8_t idx);
+    void seed();   // the starting state; mutex_ held or not yet shared
 
     mutable std::mutex mutex_;
     bool reachable_ = true;
     int latencyMs_ = 0;
 
-    uint8_t battery_ = 80;
-    std::string name_ = "Bose QC Ultra Headphones";
-    std::string firmware_ = "8.2.20+g34cf029";
-    uint8_t prompts_ = (1 << 5) | 1;   // on, US English
-    std::array<int8_t, 3> eq_ = {2, 0, -1};
-    uint8_t sidetone_ = 3;             // low
-    bool multipoint_ = true;
-    bool autoPause_ = true;
+    uint8_t battery_ = 0;
+    std::string name_;
+    std::string firmware_;
+    uint8_t prompts_ = 0;
+    std::array<int8_t, 3> eq_{};
+    uint8_t sidetone_ = 0;
+    bool multipoint_ = false;
+    bool autoPause_ = false;
     uint8_t currentMode_ = 0;
     // [31.10]: cnc, auto_cnc, spatial, wind, anc
-    std::array<uint8_t, 5> audio_ = {10, 0, 0, 1, 1};
+    std::array<uint8_t, 5> audio_{};
     std::array<Slot, 11> slots_;
 };
 

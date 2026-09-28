@@ -25,7 +25,22 @@ constexpr uint8_t kCncMax = 10;
 
 }  // namespace
 
-SimDevice::SimDevice() {
+SimDevice::SimDevice() { seed(); }
+
+void SimDevice::reset() {
+    std::lock_guard lock(mutex_);
+    seed();
+}
+
+void SimDevice::seed() {
+    battery_ = 80;
+    name_ = "Bose QC Ultra Headphones";
+    firmware_ = "8.2.20+g34cf029";
+    prompts_ = (1 << 5) | 1;   // on, US English
+    eq_ = {2, 0, -1};
+    sidetone_ = 3;             // low
+    multipoint_ = true;
+    autoPause_ = true;
     // Presets: fixed names, read-only. Their settings are what switching to
     // them applies.
     slots_[0] = {"Quiet", 10, 0, true, true, false, true};
@@ -36,6 +51,7 @@ SimDevice::SimDevice() {
     slots_[4] = {"Commute", 7, 0, true, true, true, true};
     slots_[5] = {"Focus", 10, 0, false, true, true, true};
     for (size_t i = 6; i < slots_.size(); ++i) slots_[i] = {"None", 0, 0, true, true, true, false};
+    applyMode(0);
 }
 
 std::unique_ptr<bmap::Transport> SimDevice::connect() {

@@ -55,6 +55,8 @@ public slots:
     void Refresh();
 
     QString Device() const;
+    // The headset's starting state again, then a refresh.
+    void Reset();
     void SetBattery(int pct);
     void SetReachable(bool on);
     void SetLatency(int ms);

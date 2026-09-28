@@ -22,6 +22,16 @@ To the best of my knowledge this is the first Qt/native tray app on Linux that s
 
 ![Mode manager window](docs/media/mode-manager.png)
 
+### Status notification
+
+A left-click on the tray icon shows the headset's state.
+
+![Status notification](docs/media/notification.png)
+
+### Help
+
+![Help window](docs/media/help.png)
+
 ## Features
 
 - **Auto-discovery** of paired BMAP devices via `bluetoothctl`
@@ -120,9 +130,17 @@ git submodule update --init --recursive
 make test            # or: ctest --test-dir build --output-on-failure
 ```
 
-Two binaries run: `bmap_tests` (the vendored bosectl C++ suite at the pinned
-submodule commit) and `bosectl-qt_tests` (QtTest suite for `BmapWorker` over a
-mock transport). Pass `-DBOSECTL_QT_BUILD_TESTS=OFF` to CMake to skip them.
+`bmap_tests` runs the vendored bosectl C++ suite at the pinned submodule
+commit. The other suites cover the app: `BmapWorker` over a mock transport,
+the start-on-login entry, the help content, and `tray_tests`, which drives
+the tray menu and its windows offscreen against a simulated headset. Pass
+`-DBOSECTL_QT_BUILD_TESTS=OFF` to CMake to skip them.
+
+On a Plasma desktop, `make test-ui` runs the app in a nested KWin and Plasma
+with real input and compares screenshots against goldens, and
+`make screenshots` regenerates the images above. `make sim` runs the tray
+against the simulated headset without Bluetooth. See
+[docs/testing.md](docs/testing.md).
 
 ### Install
 
