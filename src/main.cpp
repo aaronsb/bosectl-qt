@@ -8,6 +8,8 @@
 #include "BluezBatteryProvider.h"
 #include "BmapWorker.h"
 #include "Logging.h"
+#include "SimControl.h"
+#include "SimDevice.h"
 #include "TrayIcon.h"
 
 int main(int argc, char* argv[]) {
@@ -53,7 +55,27 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    TrayIcon tray;
+    // BOSECTL_QT_SIM=qc_ultra2 runs against a simulated headset and exports
+    // org.bosectl.qt /Sim for the test harness (docs/testing.md).
+    std::shared_ptr<SimDevice> sim;
+    const QString simType = qEnvironmentVariable("BOSECTL_QT_SIM");
+    if (!simType.isEmpty()) {
+        if (simType != SimDevice::kDeviceType) {
+            qCCritical(lcTray) << "BOSECTL_QT_SIM: only" << SimDevice::kDeviceType
+                               << "is simulated, not" << simType;
+            return 2;
+        }
+        sim = std::make_shared<SimDevice>();
+        qCWarning(lcTray) << "running against a simulated" << simType << "headset";
+    }
+
+    TrayIcon tray(sim);
+    std::unique_ptr<SimControl> control;
+    if (sim) {
+        control = std::make_unique<SimControl>(&tray, sim);
+        if (!control->registerOnBus())
+            qCWarning(lcTray) << "sim: could not register org.bosectl.qt /Sim";
+    }
     tray.show();
 
     return app.exec();

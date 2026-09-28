@@ -16,9 +16,8 @@ add_library(bmap STATIC
 target_include_directories(bmap PUBLIC lib/bosectl/cpp/src)
 set_target_properties(bmap PROPERTIES AUTOMOC OFF)
 
-# Qt tray application
-add_executable(bosectl-qt
-    src/main.cpp
+# Everything but main(), so the UI tests link the same code the app runs.
+add_library(bosectl-qt-core STATIC
     src/TrayIcon.cpp
     src/BmapWorker.cpp
     src/EqWindow.cpp
@@ -27,10 +26,18 @@ add_executable(bosectl-qt
     src/HelpWindow.cpp
     src/Logging.cpp
     src/BluezBatteryProvider.cpp
+    src/SimDevice.cpp
+    src/SimControl.cpp
+)
+target_link_libraries(bosectl-qt-core PUBLIC Qt6::Widgets Qt6::DBus bmap bluetooth)
+target_include_directories(bosectl-qt-core PUBLIC src)
+
+# Qt tray application
+add_executable(bosectl-qt
+    src/main.cpp
     resources/resources.qrc
 )
-target_link_libraries(bosectl-qt PRIVATE Qt6::Widgets Qt6::DBus bmap bluetooth)
-target_include_directories(bosectl-qt PRIVATE src)
+target_link_libraries(bosectl-qt PRIVATE bosectl-qt-core)
 
 # Tests
 option(BOSECTL_QT_BUILD_TESTS "Build the test binaries" ON)
