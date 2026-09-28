@@ -505,6 +505,7 @@ QWidget* HelpWindow::buildNcFrame() {
     btnRow->addWidget(apply);
     btnRow->addStretch();
     auto* close = new QPushButton("Close");   // the replica's; does nothing
+    close->setEnabled(false);             // shown for layout only
     close->setFocusPolicy(Qt::NoFocus);
     btnRow->addWidget(close);
     frame->addLayout(btnRow);
@@ -613,6 +614,7 @@ QWidget* HelpWindow::buildModesFrame() {
     auto* activate = new QPushButton("Activate");
     auto* save = new QPushButton("Save");
     auto* close = new QPushButton("Close");   // the replica's; does nothing
+    close->setEnabled(false);             // shown for layout only
     close->setFocusPolicy(Qt::NoFocus);
     actionRow->addWidget(activate);
     actionRow->addWidget(save);
@@ -678,6 +680,7 @@ QWidget* HelpWindow::buildEqFrame() {
     auto* saveBtn = new QPushButton("Save");
     auto* resetBtn = new QPushButton("Reset");
     auto* close = new QPushButton("Close");   // the replica's; does nothing
+    close->setEnabled(false);             // shown for layout only
     close->setFocusPolicy(Qt::NoFocus);
     buttonRow->addWidget(tryBtn);
     buttonRow->addWidget(saveBtn);
