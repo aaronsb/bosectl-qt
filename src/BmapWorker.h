@@ -126,6 +126,7 @@ public:
         static constexpr Pair kMap[] = {
             {"Host is down",              "Headphones appear to be off or out of range."},
             {"No route to host",          "Cannot reach the headphones — are they powered on?"},
+            {"Headphones busy",           "Headphones are busy — try again in a few seconds."},
             {"Device or resource busy",   "Bluetooth is busy — try again in a moment."},
             {"Operation now in progress", "Connection timed out — headphones not responding."},
             {"Connection timed out",      "Connection timed out — headphones not responding."},
@@ -169,14 +170,18 @@ public slots:
             QThread::msleep(kReconnectSettleMs);
         }
 
-        // Retry on transient failures. EBUSY and similar post-teardown errors
-        // usually clear within a second — worth absorbing silently instead of
-        // surfacing a scary disconnect notification.
+        // bmap::connect() requires a device type alongside an explicit MAC.
+        // A saved MAC without a type falls back to auto-detection.
+        const QString connectMac = deviceType.isEmpty() ? QString() : mac;
+
+        // The library already retries a busy channel with backoff, so busy and
+        // bad-argument errors end the loop here. Other failures (link drop
+        // mid-handshake, timeouts) get one more try.
         std::string lastErr;
         for (int attempt = 1; attempt <= kConnectMaxAttempts; ++attempt) {
             try {
-                conn_ = bmap::connect(mac.toStdString(), deviceType.toStdString());
-                connMac_ = mac;
+                conn_ = bmap::connect(connectMac.toStdString(), deviceType.toStdString());
+                connMac_ = connectMac;
                 if (connMac_.isEmpty()) {
                     auto detected = bmap::find_bmap_device();
                     if (detected) {
@@ -190,6 +195,14 @@ public slots:
                                  << "mac=" << connMac_ << "type=" << connDeviceType_;
                 emitStatus();
                 return;
+            } catch (const bmap::busy_error& e) {
+                lastErr = e.what();
+                qCWarning(lcWorker) << "connectDevice: headphones busy:" << e.what();
+                break;
+            } catch (const std::invalid_argument& e) {
+                lastErr = e.what();
+                qCWarning(lcWorker) << "connectDevice: invalid arguments:" << e.what();
+                break;
             } catch (const std::exception& e) {
                 lastErr = e.what();
                 qCWarning(lcWorker) << "connectDevice: attempt" << attempt
@@ -424,7 +437,7 @@ private:
 
     static constexpr int kReconnectSettleMs = 300;
     static constexpr int kConnectRetryDelayMs = 500;
-    static constexpr int kConnectMaxAttempts = 3;
+    static constexpr int kConnectMaxAttempts = 2;
 
     // Translate kernel errno strings from libbmap's "Failed to connect ...:"
     // wrapper into messages a user can actually act on.
