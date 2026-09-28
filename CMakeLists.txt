@@ -24,6 +24,7 @@ add_executable(bosectl-qt
     src/EqWindow.cpp
     src/ModeWindow.cpp
     src/NcWindow.cpp
+    src/HelpWindow.cpp
     src/Logging.cpp
     src/BluezBatteryProvider.cpp
     resources/resources.qrc

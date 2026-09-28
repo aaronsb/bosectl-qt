@@ -8,7 +8,16 @@
 #include <QSignalBlocker>
 
 #include "Autostart.h"
+#include "HelpContent.h"
 #include "Logging.h"
+
+namespace {
+// Hovering a menu entry shows the first sentence of its help.md entry, so
+// the tooltips and the Help window say the same thing.
+void setHelpTip(QAction* action, const QString& id) {
+    action->setToolTip(HelpContent::shared().tooltip(id));
+}
+}  // namespace
 
 TrayIcon::TrayIcon(QObject* parent)
     : QSystemTrayIcon(parent)
@@ -142,14 +151,20 @@ TrayIcon::~TrayIcon() {
     delete menu_;
     delete ncWindow_;
     delete eqWindow_;
+    delete helpWindow_;
     delete modeWindow_;
     delete dialogAnchor_;
 }
 
 void TrayIcon::buildMenu() {
+    for (const QString& problem : HelpContent::shared().errors())
+        qCWarning(lcTray) << "help.md:" << problem;
+    menu_->setToolTipsVisible(true);
+
     // ── Header ──────────────────────────────────────────────────────────────
     // Device name is a submenu so we can hang actions (Rename...) off it.
     headerMenu_ = menu_->addMenu("Bose Headphones");
+    headerMenu_->setToolTipsVisible(true);
     QFont boldFont = headerMenu_->menuAction()->font();
     boldFont.setBold(true);
     headerMenu_->menuAction()->setFont(boldFont);
@@ -179,17 +194,24 @@ void TrayIcon::buildMenu() {
                                   Q_ARG(QString, name));
     });
     renameAction_->setEnabled(false);
+    setHelpTip(headerMenu_->menuAction(), "menu.device");
+    setHelpTip(renameAction_, "menu.rename");
 
     batteryAction_ = menu_->addAction("Battery: --");
+    setHelpTip(batteryAction_, "menu.battery");
 
     // About submenu
     aboutMenu_ = menu_->addMenu("About");
+    aboutMenu_->setToolTipsVisible(true);
+    setHelpTip(aboutMenu_->menuAction(), "menu.about");
     firmwareAction_ = aboutMenu_->addAction("Firmware: --");
     firmwareAction_->setEnabled(false);
+    setHelpTip(firmwareAction_, "menu.firmware");
     macAction_ = aboutMenu_->addAction("MAC: --");
     macAction_->setEnabled(false);
+    setHelpTip(macAction_, "menu.mac");
     aboutMenu_->addSeparator();
-    aboutMenu_->addAction("About bosectl-qt...", this, [this] {
+    auto* aboutAction = aboutMenu_->addAction("About bosectl-qt...", this, [this] {
         QMessageBox about(QMessageBox::NoIcon, "About bosectl-qt",
             QString("<h3>bosectl-qt</h3>"
                     "<p>A Qt6 system tray application for controlling "
@@ -207,34 +229,49 @@ void TrayIcon::buildMenu() {
         about.setTextInteractionFlags(Qt::TextBrowserInteraction);
         about.exec();
     });
+    setHelpTip(aboutAction, "menu.about");
+
+    // ── Help (opens window) ─────────────────────────────────────────────────
+    auto* helpAction = menu_->addAction("Help...", this, [this] {
+        if (!helpWindow_) helpWindow_ = new HelpWindow;
+        helpWindow_->show();
+        helpWindow_->raise();
+        helpWindow_->activateWindow();
+    });
+    setHelpTip(helpAction, "menu.help");
 
     menu_->addSeparator();
 
     // ── Noise Cancellation (opens window) ──────────────────────────────────
-    menu_->addAction("Noise Cancellation...", this, [this] {
+    auto* ncAction = menu_->addAction("Noise Cancellation...", this, [this] {
         ncWindow_->show();
         ncWindow_->raise();
         ncWindow_->activateWindow();
     });
+    setHelpTip(ncAction, "menu.noise-cancellation");
 
     // ── Mode (opens window) ─────────────────────────────────────────────────
-    menu_->addAction("Modes...", this, [this] {
+    auto* modesAction = menu_->addAction("Modes...", this, [this] {
         // Fetch fresh mode data when opening
         QMetaObject::invokeMethod(worker_, "fetchModeDetails", Qt::QueuedConnection);
         modeWindow_->show();
         modeWindow_->raise();
         modeWindow_->activateWindow();
     });
+    setHelpTip(modesAction, "menu.modes");
 
     // ── Equalizer (opens window) ────────────────────────────────────────────
-    menu_->addAction("Equalizer...", this, [this] {
+    auto* eqAction = menu_->addAction("Equalizer...", this, [this] {
         eqWindow_->show();
         eqWindow_->raise();
         eqWindow_->activateWindow();
     });
+    setHelpTip(eqAction, "menu.equalizer");
 
     // ── Spatial audio submenu ───────────────────────────────────────────────
     spatialMenu_ = menu_->addMenu("Spatial Audio");
+    spatialMenu_->setToolTipsVisible(true);
+    setHelpTip(spatialMenu_->menuAction(), "menu.spatial");
     spatialGroup_ = new QActionGroup(this);
     spatialGroup_->setExclusive(true);
     for (const auto& [label, value] : std::vector<std::pair<QString, QString>>{
@@ -242,12 +279,15 @@ void TrayIcon::buildMenu() {
         auto* a = spatialMenu_->addAction(label);
         a->setCheckable(true);
         a->setData(value);
+        setHelpTip(a, "menu.spatial." + value);
         spatialGroup_->addAction(a);
     }
     connect(spatialGroup_, &QActionGroup::triggered, this, &TrayIcon::onSpatialSelected);
 
     // ── Sidetone submenu ────────────────────────────────────────────────────
     sidetoneMenu_ = menu_->addMenu("Sidetone");
+    sidetoneMenu_->setToolTipsVisible(true);
+    setHelpTip(sidetoneMenu_->menuAction(), "menu.sidetone");
     sidetoneGroup_ = new QActionGroup(this);
     sidetoneGroup_->setExclusive(true);
     for (const auto& [label, value] : std::vector<std::pair<QString, QString>>{
@@ -255,6 +295,7 @@ void TrayIcon::buildMenu() {
         auto* a = sidetoneMenu_->addAction(label);
         a->setCheckable(true);
         a->setData(value);
+        setHelpTip(a, "menu.sidetone." + value);
         sidetoneGroup_->addAction(a);
     }
     connect(sidetoneGroup_, &QActionGroup::triggered, this, &TrayIcon::onSidetoneSelected);
@@ -264,20 +305,22 @@ void TrayIcon::buildMenu() {
     // ── Toggles ─────────────────────────────────────────────────────────────
     ancAction_ = menu_->addAction("Noise Cancellation (ANC)");
     ancAction_->setCheckable(true);
-    ancAction_->setToolTip("ANC must be on for the NC slider to take effect");
+    setHelpTip(ancAction_, "menu.anc");
     connect(ancAction_, &QAction::toggled, this, &TrayIcon::onAncToggled);
 
     windAction_ = menu_->addAction("Wind Block");
     windAction_->setCheckable(true);
-    windAction_->setToolTip("Wind Block overrides the NC slider");
+    setHelpTip(windAction_, "menu.wind-block");
     connect(windAction_, &QAction::toggled, this, &TrayIcon::onWindToggled);
 
     multipointAction_ = menu_->addAction("Multipoint");
     multipointAction_->setCheckable(true);
+    setHelpTip(multipointAction_, "menu.multipoint");
     connect(multipointAction_, &QAction::toggled, this, &TrayIcon::onMultipointToggled);
 
     autoPauseAction_ = menu_->addAction("Auto-Pause");
     autoPauseAction_->setCheckable(true);
+    setHelpTip(autoPauseAction_, "menu.auto-pause");
     connect(autoPauseAction_, &QAction::toggled, this, &TrayIcon::onAutoPauseToggled);
 
     menu_->addSeparator();
@@ -286,6 +329,8 @@ void TrayIcon::buildMenu() {
     connectAction_ = menu_->addAction("Connect", this, &TrayIcon::onConnectClicked);
     powerOffAction_ = menu_->addAction("Power Off", this, &TrayIcon::onPowerOffClicked);
     powerOffAction_->setEnabled(false);
+    setHelpTip(connectAction_, "menu.connect");
+    setHelpTip(powerOffAction_, "menu.power-off");
 
     menu_->addSeparator();
 
@@ -293,7 +338,11 @@ void TrayIcon::buildMenu() {
     startOnLoginAction_ = menu_->addAction("Start on Login");
     startOnLoginAction_->setCheckable(true);
     startOnLoginAction_->setChecked(Autostart::isEnabled());
-    startOnLoginAction_->setToolTip(Autostart::entryPath());
+    // The help sentence, then the file the checkbox writes.
+    const QString loginTip = HelpContent::shared().tooltip("menu.start-on-login");
+    startOnLoginAction_->setToolTip(loginTip.isEmpty()
+        ? Autostart::entryPath()
+        : loginTip + '\n' + Autostart::entryPath());
     connect(startOnLoginAction_, &QAction::toggled, this, &TrayIcon::onStartOnLoginToggled);
     // Re-read on every open: System Settings → Autostart can remove the entry
     // behind our back.
@@ -302,7 +351,7 @@ void TrayIcon::buildMenu() {
         startOnLoginAction_->setChecked(Autostart::isEnabled());
     });
 
-    menu_->addAction("Quit", qApp, &QApplication::quit);
+    setHelpTip(menu_->addAction("Quit", qApp, &QApplication::quit), "menu.quit");
 }
 
 // ── Slots ───────────────────────────────────────────────────────────────────

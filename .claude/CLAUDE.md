@@ -1,5 +1,23 @@
 # bosectl-qt
 
+## Branches
+
+`main` is what's released. arch-repo publishes `bosectl-qt-git` from `main` HEAD
+and republishes `bosectl-qt` whenever `PKGBUILD` on `main` changes, so anything
+merged to `main` reaches AUR users.
+
+Work for the next release lands on `next`: feature branches start from `next`
+and their PRs target `next`. At release time, merge `next` into `main` in the
+same change that bumps the version and moves `_bosectl_commit` in `PKGBUILD`,
+then `make package`, then `make release`. A packaging-only fix or an urgent
+bugfix can still go straight to `main`; merge `main` back into `next` after.
+
+`_bosectl_commit` pins the bosectl commit the release package builds against.
+Local builds use the `lib/bosectl` submodule instead, so a submodule bump
+builds locally and still fails `make package` until the pin matches. Move
+the pin only on `main` at release time; moving it earlier republishes the
+current release against a different library.
+
 ## Releasing
 
 `aaronsb/arch-repo` publishes this project. It reads `PKGBUILD` from the default
