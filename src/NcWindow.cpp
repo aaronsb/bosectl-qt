@@ -1,5 +1,6 @@
 #include "NcWindow.h"
 
+#include "HelpContent.h"
 #include "Logging.h"
 
 NcWindow::NcWindow(QWidget* parent)
@@ -82,6 +83,11 @@ NcWindow::NcWindow(QWidget* parent)
     });
 
     connect(closeBtn, &QPushButton::clicked, this, &QWidget::close);
+
+    // Tooltips: first sentence of each control's help.md entry
+    const HelpContent& help = HelpContent::shared();
+    slider_->setToolTip(help.tooltip("nc.slider"));
+    applyBtn->setToolTip(help.tooltip("nc.apply"));
 }
 
 void NcWindow::setValue(int val) {
