@@ -8,6 +8,8 @@
 #include "BluezBatteryProvider.h"
 #include "BmapWorker.h"
 #include "Logging.h"
+#include "SimControl.h"
+#include "SimDevice.h"
 #include "TrayIcon.h"
 
 int main(int argc, char* argv[]) {
@@ -33,14 +35,6 @@ int main(int argc, char* argv[]) {
         qCInfo(lcTray) << "verbose logging enabled";
     }
 
-    qRegisterMetaType<uint8_t>("uint8_t");
-    qRegisterMetaType<int8_t>("int8_t");
-    qRegisterMetaType<EqState>("EqState");
-    qRegisterMetaType<DeviceState>("DeviceState");
-    qRegisterMetaType<QStringList>("QStringList");
-    qRegisterMetaType<ModeInfo>("ModeInfo");
-    qRegisterMetaType<QList<ModeInfo>>("QList<ModeInfo>");
-
     // QtDBus needs to know how to marshal these nested container types so
     // ObjectManager.GetManagedObjects() and the BlueZ Battery Provider
     // registration can round-trip a{oa{sa{sv}}} correctly.
@@ -53,7 +47,27 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    TrayIcon tray;
+    // BOSECTL_QT_SIM=qc_ultra2 runs against a simulated headset and exports
+    // org.bosectl.qt /Sim for the test harness (docs/testing.md).
+    std::shared_ptr<SimDevice> sim;
+    const QString simType = qEnvironmentVariable("BOSECTL_QT_SIM");
+    if (!simType.isEmpty()) {
+        if (simType != SimDevice::kDeviceType) {
+            qCCritical(lcTray) << "BOSECTL_QT_SIM: only" << SimDevice::kDeviceType
+                               << "is simulated, not" << simType;
+            return 2;
+        }
+        sim = std::make_shared<SimDevice>();
+        qCWarning(lcTray) << "running against a simulated" << simType << "headset";
+    }
+
+    TrayIcon tray(sim);
+    std::unique_ptr<SimControl> control;
+    if (sim) {
+        control = std::make_unique<SimControl>(&tray, sim);
+        if (!control->registerOnBus())
+            qCWarning(lcTray) << "sim: could not register org.bosectl.qt /Sim";
+    }
     tray.show();
 
     return app.exec();

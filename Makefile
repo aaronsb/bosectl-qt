@@ -10,7 +10,15 @@
 #   make build         # cmake configure + compile to ./build/
 #   make run           # build, then run ./build/bosectl-qt
 #   make run-verbose   # build, then run with --verbose logging
-#   make test          # build, then run ctest (bmap suite + app suite)
+#   make test          # build, then run ctest (library, app and offscreen UI suites)
+#   make sim           # build, then run against a simulated headset (no Bluetooth)
+#
+# ── UI tests and screenshots in a nested Plasma (docs/testing.md) ──────
+#   make test-ui       # scenarios with real input in a nest, compared to goldens
+#   make golden        # re-record tests/ui/golden from the current build
+#   make screenshots   # regenerate the README's docs/media stills
+#   make nest          # a nest with the app in it, as a window to look at
+#   make nest-down     # stop it
 #   make clean         # rm -rf ./build/
 #
 # ── Cutting a release ──────────────────────────────────────────────────
@@ -60,7 +68,8 @@ SRCNAME := $(or $(shell sed -n 's/^_repo=//p' PKGBUILD),$(NAME))
 # $(shell ...) and an escaped one in a regex reads as unbalanced to it.
 CURRENT_VERSION := $(shell awk '/^project.bosectl-qt VERSION/ {print $$3}' CMakeLists.txt)
 
-.PHONY: help build clean run run-verbose test \
+.PHONY: help build clean run run-verbose test sim tools \
+        test-ui golden screenshots nest nest-down \
         bump-version release check package version \
         _check-version
 
@@ -78,6 +87,15 @@ help:
 	@printf '    make run           build, then run ./build/bosectl-qt\n'
 	@printf '    make run-verbose   build, then run with --verbose logging\n'
 	@printf '    make clean         rm -rf ./build/\n'
+	@printf '    make test          build, then run the ctest suites (offscreen UI included)\n'
+	@printf '    make sim           build, then run against a simulated headset\n'
+	@printf '\n'
+	@printf '  \033[1mUI tests and screenshots\033[0m (nested Plasma; docs/testing.md)\n'
+	@printf '    make test-ui       scenarios with real input, compared to goldens\n'
+	@printf '    make golden        re-record tests/ui/golden\n'
+	@printf '    make screenshots   regenerate docs/media for the README\n'
+	@printf '    make nest          a nest with the app in it, to look at and drive\n'
+	@printf '    make nest-down     stop it\n'
 	@printf '\n'
 	@printf '  \033[1mBefore you release\033[0m\n'
 	@printf '    make check         compile, and report the version\n'
@@ -121,8 +139,34 @@ run: build
 run-verbose: build
 	$(BIN) --verbose
 
-test: build ## Build, then run both test suites via ctest
+test: build ## Build, then run the ctest suites
 	ctest --test-dir $(BUILD_DIR) --output-on-failure
+
+# In the live session: the tray icon appears in your real panel, backed by
+# the simulated headset. make nest keeps it out of your session.
+sim: build
+	BOSECTL_QT_SIM=qc_ultra2 $(BIN) --verbose
+
+# ─── Nested Plasma: UI tests and screenshots ────────────────────────────────
+
+tools:
+	$(MAKE) -s -C tools
+
+test-ui: build tools
+	tests/ui/run.sh $(ARGS)
+
+golden: build tools
+	tests/ui/run.sh --update-golden
+
+screenshots: build tools
+	docs/screenshots.sh
+
+nest: build tools
+	NEST_NAME=dev dev/nest.sh up
+	NEST_NAME=dev dev/nest.sh app
+
+nest-down:
+	NEST_NAME=dev dev/nest.sh down
 
 # ─── Release ceremony ───────────────────────────────────────────────────────
 
