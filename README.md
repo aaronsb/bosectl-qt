@@ -42,26 +42,42 @@ A left-click on the tray icon shows the headset's state.
 - **Spatial audio** — Off, Room, Head Tracking
 - **Sidetone** — Off, Low, Medium, High
 - **Multipoint** and **Auto-Pause** toggles
-- **Battery, firmware, and MAC** display under an *About* submenu
+- **Battery** in the menu, flagged at 15% and below, and published to BlueZ so desktop power indicators show it
+- **Rename** the headphones; **firmware and MAC** under an *About* submenu
+- **Status notification** on left-click: battery, mode, NC, spatial, EQ and toggles at a glance
+- **Help window** mapping every menu entry and dialog, with the same text as the tooltips
 - **Working indicator** across all windows for feedback during BT operations
 - **Settings persistence** in `~/.config/bosectl-qt/` — remembers your last device
-- **Auto-start** via XDG desktop entry (optional)
+- **Start on Login** toggle in the menu, which writes `~/.config/autostart/bosectl-qt.desktop`
 - **Cross-desktop** — uses plain `QSystemTrayIcon` so it works on KDE, GNOME, Xfce, Sway, and anything else with an SNI/XEmbed tray
 
 ## Supported devices
 
-Currently verified:
+bosectl-qt talks to any headset the [bosectl](https://github.com/aaronsb/bosectl#supported-devices) library supports, but only the QC Ultra Headphones 2 has been tried end to end in this app.
 
-- **Bose QuietComfort Ultra Headphones**
-- **Bose QuietComfort 35 / 35 II** (via the bosectl library, untested in Qt UI)
+| | Meaning |
+|---|---|
+| ✅ Yes | Verified in bosectl-qt on hardware |
+| 🟡 Probably | Verified in the bosectl library; the app uses the same calls but nobody has reported on it yet |
+| ⚪ Untested | The library recognises it with partial support, or the app lacks controls for what the device does |
+| ❌ Not yet | In bosectl's device catalog without a tested configuration |
 
-Recognised through the bosectl library, untested in the Qt UI: QuietComfort
-Headphones (`prince`), QuietComfort Earbuds (`lando`), QuietComfort 45
-(`duran`, inferred layout), Ultra Open Earbuds (`serena`, read and switch
-only). Profile editing uses each device's own ModeConfig builder; devices
-without one report "not supported" in the mode manager.
+| Device | Codename | bosectl-qt | What to expect |
+|---|---|---|---|
+| QuietComfort Ultra Headphones (2nd Gen) | `wolverine` | ✅ Yes | Everything in the menu and windows |
+| QuietComfort Ultra Earbuds (2nd Gen) | `edith` | 🟡 Probably | Same protocol as the headphones. One battery figure for the pair; the case is not shown |
+| QuietComfort Headphones | `prince` | 🟡 Probably | EQ, modes and two custom profile slots. The NC slider, spatial audio and Wind Block change the active custom profile, so they report an error on Quiet or Aware. No ANC toggle |
+| QuietComfort 45 | `duran` | 🟡 Probably | As the QuietComfort Headphones: EQ, modes, two custom slots, NC through the active custom profile |
+| QuietComfort Earbuds | `lando` | ⚪ Untested | NC slider, EQ and four fixed modes. Profile editing reports "not supported" |
+| QuietComfort 35 / 35 II | `baywolf` | ⚪ Untested | Battery, name and sidetone. Its ANR levels (off/low/high/wind) have no control in the app yet |
+| Ultra Open Earbuds | `serena` | ⚪ Untested | Open-ear, so no NC. EQ, multipoint and mode switching |
+| Noise Cancelling Headphones 700, QuietComfort Ultra Headphones (1st Gen), QuietComfort Earbuds II, QuietComfort Ultra Earbuds (1st Gen) | | ❌ Not yet | Recognised by product ID, but no configuration yet |
 
-Other Bose devices may work — see the [bosectl device support list](https://github.com/aaronsb/bosectl#supported-devices).
+Have one of these? A report moves it up the table:
+
+- **It works, or partly works, in bosectl-qt:** [open a device report](https://github.com/aaronsb/bosectl/issues/new?template=device-report.yml) with the firmware version and which menu entries and windows worked.
+- **It is ⚪ or ❌:** the same report, with the output of `bosectl status` and `bosectl dump` attached. Those two commands capture what the library needs to write a configuration. [Adding a new device](https://github.com/aaronsb/bosectl/blob/main/docs/architecture.md#adding-a-new-device) describes the rest.
+- **Something broke:** [open a bug here](https://github.com/aaronsb/bosectl-qt/issues/new), with the output of `bosectl-qt --verbose`.
 
 ## Installation
 
@@ -161,8 +177,9 @@ cp /usr/share/bosectl-qt/bosectl-qt-autostart.desktop ~/.config/autostart/bosect
 
 1. Pair and connect your Bose headphones via `bluetoothctl` or your desktop's Bluetooth settings
 2. Launch `bosectl-qt`
-3. The tray icon auto-discovers the first connected BMAP device and shows status in the tooltip
-4. Right-click the tray icon for the full control menu
+3. The tray icon auto-discovers the first connected BMAP device and shows its status in the tooltip
+4. Left-click the tray icon for a status notification; right-click it for the full control menu
+5. **Help...** in the menu explains every entry and window
 
 The sliders and the Mode manager open separate windows instead of being embedded in the tray menu — this is a deliberate design choice because Qt's `QWidgetAction` doesn't render reliably inside menus on Wayland.
 
@@ -177,35 +194,58 @@ The NC window displays a reminder about these, and ANC / Wind Block are exposed 
 
 ## Architecture
 
-```
-┌─────────────────────────────────────┐
-│ GUI thread (Qt widgets)             │
-│ ├── TrayIcon (QSystemTrayIcon)      │
-│ ├── NcWindow / EqWindow             │
-│ └── ModeWindow                       │
-└────────────┬────────────────────────┘
-             │ signals/slots (queued)
-┌────────────┴────────────────────────┐
-│ Worker thread                       │
-│ └── BmapWorker → bmap::BmapConnection│
-└────────────┬────────────────────────┘
-             │ RFCOMM (Bluetooth socket)
-┌────────────┴────────────────────────┐
-│ Headphones (BMAP protocol)          │
-└─────────────────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph gui["GUI thread"]
+        tray["TrayIcon<br>tray icon + menu"]
+        windows["NcWindow · EqWindow<br>ModeWindow · HelpWindow"]
+    end
+    subgraph worker["Worker thread"]
+        bw["BmapWorker<br>one slot per operation"]
+        conn["bmap::BmapConnection"]
+    end
+    headset["Headphones<br>BMAP over RFCOMM"]
+    sim["SimDevice<br>BOSECTL_QT_SIM"]
+    bluez["BlueZ<br>BatteryProvider1"]
+    settings[("~/.config/bosectl-qt")]
+
+    windows -- "signals" --> tray
+    tray -- "invokeMethod, queued" --> bw
+    bw -- "statusReady · busy · error" --> tray
+    bw --> conn
+    conn -- "Bluetooth" --> headset
+    conn -. "sim mode" .-> sim
+    tray -- "battery %" --> bluez
+    tray <--> settings
+
+    classDef ui fill:#2d7d9a,stroke:#94a3b8,color:#ffffff
+    classDef core fill:#7c3aed,stroke:#94a3b8,color:#ffffff
+    classDef external fill:#f6821f,stroke:#4a5568,color:#1a1a1a
+    classDef test fill:#fbbf24,stroke:#4a5568,color:#1a1a1a
+    classDef store fill:#2d8e5e,stroke:#94a3b8,color:#ffffff
+    class tray,windows ui
+    class bw,conn core
+    class headset,bluez external
+    class sim test
+    class settings store
+    style gui stroke:#0891b2,fill:#2d7d9a1a,color:#0891b2
+    style worker stroke:#8b5cf6,fill:#7c3aed1a,color:#8b5cf6
 ```
 
 All blocking Bluetooth I/O runs on a dedicated worker thread. The GUI queues operations via `QMetaObject::invokeMethod` and receives state updates via queued signals. A RAII `BusyGuard` around each worker slot emits `busy(true/false)` so every window can show a "Working…" indicator automatically.
+
+The worker reaches the headset through a `Connector`, Bluetooth by default. `BOSECTL_QT_SIM=qc_ultra2` swaps in `SimDevice`, a simulated QC Ultra 2 the tests and screenshots run against ([docs/testing.md](docs/testing.md)). The tray publishes the battery level to BlueZ, so desktop power indicators show it; in sim mode it publishes nothing.
 
 Settings are stored in `~/.config/bosectl-qt/bosectl-qt.conf` via `QSettings`.
 
 ## Roadmap
 
-- [ ] Pre-built binaries: Flatpak, AppImage, Arch AUR, Debian package
-- [x] CI builds with GitHub Actions
-- [ ] Button remapping UI (bmap library already supports it)
-- [ ] Voice prompts language selector
-- [ ] Verify the Qt UI on the devices bosectl now recognises (prince, lando, QC45, Ultra Open)
+- [ ] Flatpak, AppImage and Debian packages (the AUR packages exist)
+- [ ] ANR levels for the QuietComfort 35, which has no NC slider
+- [ ] Per-bud and case battery for earbuds
+- [ ] Button remapping (the library supports it)
+- [ ] Voice prompt language
+- [ ] Reports from the 🟡 and ⚪ devices in [Supported devices](#supported-devices)
 - [ ] Translations
 
 ## Credits
