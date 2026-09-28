@@ -85,9 +85,10 @@ whose `out()` lines come back.
 `tools/fakeinput.c` is copied from kwin-canvas and injects input through
 `org_kde_kwin_fake_input`. The nest runs KWin with
 `KWIN_WAYLAND_NO_PERMISSION_CHECKS=1`, so the tool needs no `.desktop`
-registration. It and the protocol file keep their GPL-2.0-or-later and
-LGPL-2.1-or-later licences (`LICENSES/`). They are separate test programs,
-and nothing of them links into the app.
+registration. `fakeinput.c` and `keys.h` are MIT. The protocol file,
+`tools/protocols/fake-input.xml`, is KDE's and stays LGPL-2.1-or-later
+(`LICENSES/`). The tool is a separate test program, and nothing of it links
+into the app.
 
 ## UI scenarios
 

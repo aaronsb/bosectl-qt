@@ -1,6 +1,6 @@
 /*
     SPDX-FileCopyrightText: 2026 Aaron Bockelie <aaronsb@gmail.com>
-    SPDX-License-Identifier: GPL-2.0-or-later
+    SPDX-License-Identifier: MIT
 */
 /* fakeinput: inject pointer and keyboard events into a KWin Wayland session
  * through org_kde_kwin_fake_input.

@@ -6,9 +6,9 @@
 #   make -C tools          build build/tools/fakeinput
 #   make -C tools clean    remove build/tools
 #
-# fakeinput.c and keys.h are GPL-2.0-or-later and the protocol is
-# LGPL-2.1-or-later (LICENSES/). The tool is a separate test program; nothing
-# of it links into bosectl-qt.
+# fakeinput.c and keys.h are MIT like the rest of the repository.
+# protocols/fake-input.xml is KDE's, LGPL-2.1-or-later (LICENSES/); the
+# tool is a separate test program and nothing of it links into bosectl-qt.
 
 TOOLS := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 TOP   := $(abspath $(TOOLS)/..)
