@@ -136,7 +136,7 @@ Autostart is opt-in per user. Check **Start on Login** in the tray menu, which w
 
 ```bash
 mkdir -p ~/.config/autostart
-cp /usr/share/bosectl-qt/bosectl-qt-autostart.desktop ~/.config/autostart/
+cp /usr/share/bosectl-qt/bosectl-qt-autostart.desktop ~/.config/autostart/bosectl-qt.desktop
 ```
 
 ## Usage

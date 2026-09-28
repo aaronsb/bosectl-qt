@@ -308,7 +308,8 @@ void TrayIcon::buildMenu() {
 // ── Slots ───────────────────────────────────────────────────────────────────
 
 void TrayIcon::onStartOnLoginToggled(bool checked) {
-    if (Autostart::setEnabled(checked, QCoreApplication::applicationFilePath())) {
+    const QString exec = Autostart::execFor(QCoreApplication::applicationFilePath());
+    if (Autostart::setEnabled(checked, exec)) {
         qCInfo(lcTray) << "start on login" << (checked ? "enabled:" : "disabled:")
                        << Autostart::entryPath();
         return;
@@ -318,7 +319,7 @@ void TrayIcon::onStartOnLoginToggled(bool checked) {
     startOnLoginAction_->setChecked(Autostart::isEnabled());
     QMessageBox::warning(dialogAnchor_, "Start on Login",
         QString("Could not %1 %2")
-            .arg(checked ? "write" : "remove", Autostart::entryPath().toHtmlEscaped()));
+            .arg(checked ? "write" : "remove", Autostart::entryPath()));
 }
 
 void TrayIcon::onStatusReady(DeviceState state) {
