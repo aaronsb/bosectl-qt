@@ -35,6 +35,7 @@ private slots:
     void onWindToggled(bool checked);
     void onConnectClicked();
     void onPowerOffClicked();
+    void onStartOnLoginToggled(bool checked);
 
 private:
     void buildMenu();
@@ -73,6 +74,7 @@ private:
 
     QAction* connectAction_;
     QAction* powerOffAction_;
+    QAction* startOnLoginAction_;
 
     QThread workerThread_;
     BmapWorker* worker_;

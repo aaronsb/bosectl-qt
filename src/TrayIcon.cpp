@@ -5,7 +5,9 @@
 #include <QIcon>
 #include <QInputDialog>
 #include <QMessageBox>
+#include <QSignalBlocker>
 
+#include "Autostart.h"
 #include "Logging.h"
 
 TrayIcon::TrayIcon(QObject* parent)
@@ -284,10 +286,40 @@ void TrayIcon::buildMenu() {
     connectAction_ = menu_->addAction("Connect", this, &TrayIcon::onConnectClicked);
     powerOffAction_ = menu_->addAction("Power Off", this, &TrayIcon::onPowerOffClicked);
     powerOffAction_->setEnabled(false);
+
+    menu_->addSeparator();
+
+    // ── Session ─────────────────────────────────────────────────────────────
+    startOnLoginAction_ = menu_->addAction("Start on Login");
+    startOnLoginAction_->setCheckable(true);
+    startOnLoginAction_->setChecked(Autostart::isEnabled());
+    startOnLoginAction_->setToolTip(Autostart::entryPath());
+    connect(startOnLoginAction_, &QAction::toggled, this, &TrayIcon::onStartOnLoginToggled);
+    // Re-read on every open: System Settings → Autostart can remove the entry
+    // behind our back.
+    connect(menu_, &QMenu::aboutToShow, this, [this] {
+        QSignalBlocker block(startOnLoginAction_);
+        startOnLoginAction_->setChecked(Autostart::isEnabled());
+    });
+
     menu_->addAction("Quit", qApp, &QApplication::quit);
 }
 
 // ── Slots ───────────────────────────────────────────────────────────────────
+
+void TrayIcon::onStartOnLoginToggled(bool checked) {
+    if (Autostart::setEnabled(checked, QCoreApplication::applicationFilePath())) {
+        qCInfo(lcTray) << "start on login" << (checked ? "enabled:" : "disabled:")
+                       << Autostart::entryPath();
+        return;
+    }
+    qCWarning(lcTray) << "could not update autostart entry" << Autostart::entryPath();
+    QSignalBlocker block(startOnLoginAction_);
+    startOnLoginAction_->setChecked(Autostart::isEnabled());
+    QMessageBox::warning(dialogAnchor_, "Start on Login",
+        QString("Could not %1 %2")
+            .arg(checked ? "write" : "remove", Autostart::entryPath().toHtmlEscaped()));
+}
 
 void TrayIcon::onStatusReady(DeviceState state) {
     const bool wasConnected = lastState_.connected;
