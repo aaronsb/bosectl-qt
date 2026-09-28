@@ -1,10 +1,12 @@
-# Two test binaries:
+# Three test binaries:
 #   bmap_tests        — the vendored bosectl C++ suite, built against the
 #                       submodule commit this app pins. Catches a stale or
 #                       broken pin before the tray ever links it.
 #   bosectl-qt_tests  — QtTest suite for the app's own logic (BmapWorker
 #                       slots over a mock transport, error mapping, state
 #                       comparison).
+#   autostart_tests   — start-on-login entry write/remove, under
+#                       QStandardPaths test mode.
 
 find_package(Qt6 REQUIRED COMPONENTS Test)
 
@@ -29,3 +31,8 @@ add_executable(bosectl-qt_tests
 target_include_directories(bosectl-qt_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(bosectl-qt_tests PRIVATE Qt6::Core Qt6::Test bmap bluetooth)
 add_test(NAME bosectl-qt_tests COMMAND bosectl-qt_tests)
+
+add_executable(autostart_tests test_autostart.cpp)
+target_include_directories(autostart_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(autostart_tests PRIVATE Qt6::Core Qt6::Test)
+add_test(NAME autostart_tests COMMAND autostart_tests)

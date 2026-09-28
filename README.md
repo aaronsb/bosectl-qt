@@ -132,11 +132,11 @@ sudo cmake --install build
 
 This installs the binary to `/usr/local/bin`, the desktop file to `/usr/local/share/applications`, the icon to the hicolor theme, and an autostart entry under `/usr/local/share/bosectl-qt/` (Arch: `/usr/share/bosectl-qt/`).
 
-Autostart is opt-in per user:
+Autostart is opt-in per user. Check **Start on Login** in the tray menu, which writes `~/.config/autostart/bosectl-qt.desktop`; unchecking it removes the file. KDE Plasma lists the same entry under System Settings → Autostart, and the checkbox follows changes made there. To do it by hand instead:
 
 ```bash
 mkdir -p ~/.config/autostart
-cp /usr/share/bosectl-qt/bosectl-qt-autostart.desktop ~/.config/autostart/
+cp /usr/share/bosectl-qt/bosectl-qt-autostart.desktop ~/.config/autostart/bosectl-qt.desktop
 ```
 
 ## Usage
