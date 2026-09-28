@@ -11,6 +11,7 @@
 #include "BmapWorker.h"
 #include "Settings.h"
 #include "EqWindow.h"
+#include "HelpWindow.h"
 #include "ModeWindow.h"
 #include "NcWindow.h"
 
@@ -55,6 +56,7 @@ private:
     NcWindow* ncWindow_;
     ModeWindow* modeWindow_;
     EqWindow* eqWindow_;
+    HelpWindow* helpWindow_ = nullptr;   // built on first open
 
     // Hidden widget used solely as a parent for transient modal dialogs
     // (e.g. rename). TrayIcon itself is a QObject, not a QWidget, so dialogs

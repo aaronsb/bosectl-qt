@@ -1,5 +1,6 @@
 #include "EqWindow.h"
 
+#include "HelpContent.h"
 #include "Logging.h"
 
 EqWindow::EqWindow(QWidget* parent)
@@ -65,7 +66,9 @@ void EqWindow::buildUi() {
     auto* sliderLayout = new QHBoxLayout(sliderGroup);
     sliderLayout->setSpacing(20);
 
-    auto makeBand = [&](const QString& name, QSlider*& slider, QLabel*& label) {
+    const HelpContent& help = HelpContent::shared();
+    auto makeBand = [&](const QString& name, const char* helpId,
+                        QSlider*& slider, QLabel*& label) {
         auto* col = new QVBoxLayout;
         col->setAlignment(Qt::AlignHCenter);
 
@@ -82,6 +85,7 @@ void EqWindow::buildUi() {
         slider->setMinimumHeight(120);
         slider->setTickPosition(QSlider::TicksBothSides);
         slider->setTickInterval(5);
+        slider->setToolTip(help.tooltip(helpId));
 
         auto* nameLabel = new QLabel(name);
         nameLabel->setAlignment(Qt::AlignCenter);
@@ -97,9 +101,9 @@ void EqWindow::buildUi() {
         });
     };
 
-    makeBand("Bass", bassSlider_, bassLabel_);
-    makeBand("Mid", midSlider_, midLabel_);
-    makeBand("Treble", trebleSlider_, trebleLabel_);
+    makeBand("Bass", "eq.bass", bassSlider_, bassLabel_);
+    makeBand("Mid", "eq.mid", midSlider_, midLabel_);
+    makeBand("Treble", "eq.treble", trebleSlider_, trebleLabel_);
 
     root->addWidget(sliderGroup);
 
@@ -108,11 +112,11 @@ void EqWindow::buildUi() {
     buttonRow->setSpacing(8);
 
     auto* tryBtn = new QPushButton("Try");
-    tryBtn->setToolTip("Apply EQ without saving");
+    tryBtn->setToolTip(help.tooltip("eq.try"));
     auto* saveBtn = new QPushButton("Save");
-    saveBtn->setToolTip("Apply and save EQ settings");
+    saveBtn->setToolTip(help.tooltip("eq.save"));
     auto* resetBtn = new QPushButton("Reset");
-    resetBtn->setToolTip("Reset to last saved values");
+    resetBtn->setToolTip(help.tooltip("eq.reset"));
     auto* closeBtn = new QPushButton("Close");
 
     buttonRow->addWidget(tryBtn);

@@ -1,5 +1,6 @@
 <RCC>
     <qresource prefix="/">
         <file>bosectl-qt.svg</file>
+        <file>help.md</file>
     </qresource>
 </RCC>

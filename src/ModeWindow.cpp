@@ -3,6 +3,7 @@
 #include <QInputDialog>
 #include <QFont>
 
+#include "HelpContent.h"
 #include "Logging.h"
 
 ModeWindow::ModeWindow(QWidget* parent)
@@ -243,6 +244,19 @@ void ModeWindow::buildUi() {
     rightCol->addLayout(actionRow);
 
     root->addLayout(rightCol, 1);
+
+    // Tooltips: first sentence of each control's help.md entry
+    const HelpContent& help = HelpContent::shared();
+    modeList_->setToolTip(help.tooltip("modes.list"));
+    newBtn_->setToolTip(help.tooltip("modes.new"));
+    deleteBtn_->setToolTip(help.tooltip("modes.delete"));
+    nameEdit_->setToolTip(help.tooltip("modes.name"));
+    cncSlider_->setToolTip(help.tooltip("modes.cnc"));
+    spatialCombo_->setToolTip(help.tooltip("modes.spatial"));
+    windBlockCheck_->setToolTip(help.tooltip("modes.wind-block"));
+    ancToggleCheck_->setToolTip(help.tooltip("modes.anc-toggle"));
+    activateBtn_->setToolTip(help.tooltip("modes.activate"));
+    saveBtn_->setToolTip(help.tooltip("modes.save"));
 
     // Connections
     connect(modeList_, &QListWidget::currentRowChanged, this, &ModeWindow::onModeSelected);
