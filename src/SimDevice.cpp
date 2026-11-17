@@ -184,11 +184,11 @@ std::vector<uint8_t> SimDevice::handleLocked(uint8_t fb, uint8_t fn, Operator op
         }
         if (setget) return error(kInvalidData);
         break;
-    case (1 << 8) | 10:  // multipoint, bit 1
-        if (get) return status({uint8_t(multipoint_ ? 0x02 : 0)});
+    case (1 << 8) | 10:  // multipoint: bit 0 enabled, bit 1 supported (07 on, 06 off)
+        if (get) return status({uint8_t(multipoint_ ? 0x07 : 0x06)});
         if (setget && !p.empty()) {
             multipoint_ = p[0] != 0;
-            return status({uint8_t(multipoint_ ? 0x02 : 0)});
+            return status({uint8_t(multipoint_ ? 0x07 : 0x06)});
         }
         break;
     case (1 << 8) | 11:  // sidetone: {1, level}
