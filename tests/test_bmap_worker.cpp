@@ -1,4 +1,5 @@
 // BmapWorker behaviour over a mock transport — no Bluetooth, no tray.
+#include <algorithm>
 #include <QtTest>
 #include <QSignalSpy>
 
@@ -33,11 +34,12 @@ public:
 };
 
 // 48-byte QC Ultra 2 ModeConfig STATUS for slot 4 "Work", prompts (0x0c,0x01).
-std::vector<uint8_t> ultra2Slot4() {
+// Byte 45 copies the editable flag; wind block is byte 46.
+std::vector<uint8_t> ultra2Slot4(bool wind = true) {
     std::vector<uint8_t> p = {4, 0x0c, 0x01, 1, 1, 0};
     std::string name = "Work";
     for (int i = 0; i < 32; ++i) p.push_back(i < (int)name.size() ? name[i] : 0);
-    p.insert(p.end(), {0, 0, 0, 0, 5, 0, 0, 1, 0, 1});  // cnc=5 @42, wind @45, anc @47
+    p.insert(p.end(), {0, 0, 0, 0, 5, 0, 0, 1, uint8_t(wind), 1});  // cnc=5 @42, editable @45, wind @46, anc @47
     return p;
 }
 
@@ -98,6 +100,20 @@ private slots:
         b.windBlock = !a.windBlock;  QVERIFY(a != b); b = a;
         b.deviceType = "qc45";       QVERIFY(a != b); b = a;
         b.eq.treble = 3;             QVERIFY(a != b);
+    }
+
+    void modeDetails_readWindBlockFromByte46() {
+        for (bool wind : {true, false}) {
+            Rig rig(bmap::qc_ultra2(), ultra2Slot4(wind));
+            QSignalSpy details(&rig.worker, &BmapWorker::modeDetailsReady);
+            rig.worker.fetchModeDetails();
+            QCOMPARE(details.count(), 1);
+            const auto modes = qvariant_cast<QList<ModeInfo>>(details.at(0).at(0));
+            auto it = std::find_if(modes.begin(), modes.end(),
+                                   [](const ModeInfo& m) { return m.idx == 4; });
+            QVERIFY(it != modes.end());
+            QCOMPARE(it->windBlock, wind);
+        }
     }
 
     void saveMode_usesDeviceBuilder_40bytes() {

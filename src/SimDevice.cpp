@@ -119,14 +119,15 @@ std::vector<uint8_t> SimDevice::handle(const std::vector<uint8_t>& packet) {
 }
 
 // 48-byte QC Ultra 2 ModeConfig STATUS: idx, two prompt bytes, editable,
-// configured, a reserved byte, 32 name bytes, four reserved, then cnc,
-// auto_cnc, spatial, wind, a reserved byte, anc.
+// configured, a reserved byte, 32 name bytes, four reserved, then cnc [42],
+// auto_cnc [43], spatial [44], a copy of the editable flag [45], wind [46]
+// and anc [47] (bosectl NOTES.md, ModeConfig layout).
 std::vector<uint8_t> SimDevice::slotStatus(uint8_t idx) const {
     const Slot& s = slots_[idx];
     std::vector<uint8_t> p = {idx, 0, 0, uint8_t(s.editable), uint8_t(s.configured), 0};
     auto name = bmap::encode_mode_name(s.name);
     p.insert(p.end(), name.begin(), name.end());
-    p.insert(p.end(), {0, 0, 0, 0, s.cnc, 0, s.spatial, uint8_t(s.wind), 0, uint8_t(s.anc)});
+    p.insert(p.end(), {0, 0, 0, 0, s.cnc, 0, s.spatial, uint8_t(s.editable), uint8_t(s.wind), uint8_t(s.anc)});
     return frame(31, 6, Operator::Status, p);
 }
 
@@ -184,11 +185,11 @@ std::vector<uint8_t> SimDevice::handleLocked(uint8_t fb, uint8_t fn, Operator op
         }
         if (setget) return error(kInvalidData);
         break;
-    case (1 << 8) | 10:  // multipoint, bit 1
-        if (get) return status({uint8_t(multipoint_ ? 0x02 : 0)});
+    case (1 << 8) | 10:  // multipoint: bit 0 enabled, bit 1 supported (07 on, 06 off)
+        if (get) return status({uint8_t(multipoint_ ? 0x07 : 0x06)});
         if (setget && !p.empty()) {
             multipoint_ = p[0] != 0;
-            return status({uint8_t(multipoint_ ? 0x02 : 0)});
+            return status({uint8_t(multipoint_ ? 0x07 : 0x06)});
         }
         break;
     case (1 << 8) | 11:  // sidetone: {1, level}
