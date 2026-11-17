@@ -15,7 +15,7 @@
 int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
     app.setApplicationName("bosectl-qt");
-    app.setApplicationVersion("0.6.1");
+    app.setApplicationVersion("0.7.0");
     app.setOrganizationName("bosectl");
     app.setQuitOnLastWindowClosed(false);
 
