@@ -71,7 +71,8 @@ bosectl-qt talks to any headset the [bosectl](https://github.com/aaronsb/bosectl
 | QuietComfort Earbuds | `lando` | ⚪ Untested | NC slider, EQ and four fixed modes. Profile editing reports "not supported" |
 | QuietComfort 35 / 35 II | `baywolf` | ⚪ Untested | Battery, name and sidetone. Its ANR levels (off/low/high/wind) have no control in the app yet |
 | Ultra Open Earbuds | `serena` | ⚪ Untested | Open-ear, so no NC. EQ, multipoint and mode switching |
-| Noise Cancelling Headphones 700, QuietComfort Ultra Headphones (1st Gen), QuietComfort Earbuds II, QuietComfort Ultra Earbuds (1st Gen) | | ❌ Not yet | Recognised by product ID, but no configuration yet |
+| Noise Cancelling Headphones 700 | `goodyear` | ⚪ Untested | Battery, firmware, name, the NC slider (11 levels), EQ, multipoint and sidetone are read. Only the NC slider writes: rename, EQ, multipoint and sidetone report "not supported" until a write to each has been checked on a 700. It has no modes, so the Modes window and mode switching do not work |
+| QuietComfort Ultra Headphones (1st Gen), QuietComfort Earbuds II, QuietComfort Ultra Earbuds (1st Gen) | | ❌ Not yet | Recognised by product ID, but no configuration yet |
 
 Have one of these? A report moves it up the table:
 
